@@ -1,0 +1,29 @@
+{
+  "name": "Corpus Prime",
+  "short_name": "Corpus",
+  "description": "Plataforma premium de treinamento personalizado.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f0f0f",
+  "theme_color": "#C8102E",
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "/assets/corpus_isologo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/assets/corpus_isologo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "categories": ["health", "fitness", "sports"],
+  "prefer_related_applications": false
+}

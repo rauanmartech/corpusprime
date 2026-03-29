@@ -13,6 +13,7 @@ import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { PWAInstallBanner } from "./components/PWAInstallBanner";
 
 const queryClient = new QueryClient();
 
@@ -48,6 +49,7 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <MainLayout />
+          <PWAInstallBanner />
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
