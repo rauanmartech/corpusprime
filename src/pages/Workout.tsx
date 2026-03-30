@@ -75,12 +75,59 @@ export default function Workout() {
 
   // Autenticação & Carregamento Inicial
   useEffect(() => {
+    // 1. Optimistic UI: Carregar dados do cache instantaneamente
+    const cachedWorkouts = cache.get<DBWorkout[]>("workout_list");
+    const cachedSchedule = cache.get<DBWeeklySchedule[]>("weekly_schedule");
+    if (cachedWorkouts) setWorkouts(cachedWorkouts);
+    if (cachedSchedule) setSchedule(cachedSchedule);
+    
     if (user) {
       fetchWorkouts(user.id);
+      
+      // 2. Predictive Navigation: Pré-carregar dados da aba Evolução em background
+      prefetchEvolution(user.id);
     } else {
       setLoading(false);
     }
   }, [user]);
+
+  const prefetchEvolution = async (userId: string) => {
+    try {
+       // Puxa as fichas para a evolução
+       const { data: evolutionWorkouts } = await supabase
+         .from('workouts')
+         .select('id, name')
+         .eq('user_id', userId)
+         .order('created_at', { ascending: true });
+       
+       if (evolutionWorkouts) {
+         cache.set("evolution_workouts", evolutionWorkouts);
+         // Puxa os dados do gráfico da primeira ficha (mais provável ser visualizada)
+         if (evolutionWorkouts.length > 0) {
+           const firstId = evolutionWorkouts[0].id;
+           const { data: progression } = await supabase
+             .from('user_exercise_progression')
+             .select('*')
+             .eq('workout_id', firstId)
+             .eq('user_id', userId)
+             .order('training_day', { ascending: true });
+           
+           if (progression) {
+             const grouped: Record<string, { name: string; data: any[] }> = {};
+             progression.forEach((row) => {
+               if (!grouped[row.exercise_id]) {
+                 grouped[row.exercise_id] = { name: row.exercise_name, data: [] };
+               }
+               const dateObj = new Date(row.training_day);
+               const formattedDate = dateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+               grouped[row.exercise_id].data.push({ date: formattedDate, weight: Number(row.max_weight) });
+             });
+             cache.set(`evolution_chart_${firstId}`, grouped);
+           }
+         }
+       }
+    } catch(e) {}
+  };
 
   const fetchWorkouts = async (userId: string) => {
     setLoading(true);
@@ -90,12 +137,16 @@ export default function Workout() {
     ]);
 
     if (workoutsRes.error) toast.error("Erro ao puxar treinos.");
-    else setWorkouts(workoutsRes.data || []);
+    else {
+      setWorkouts(workoutsRes.data || []);
+      cache.set("workout_list", workoutsRes.data);
+    }
 
     if (scheduleRes.error) {
       toast.error("Erro ao puxar agenda.");
     } else {
       setSchedule(scheduleRes.data || []);
+      cache.set("weekly_schedule", scheduleRes.data);
       const today = new Date().getDay();
       const todaySched = scheduleRes.data?.find(s => s.day_of_week === today);
       if (todaySched && workoutsRes.data) {
@@ -476,6 +527,21 @@ export default function Workout() {
 
       // 5. Finalizar Limpeza Local e Cloud Draft
       toast.success("Treino Finalizado com Sucesso! 💪🔥");
+      
+      // Update Dashboard Cache Optimistically
+      const cachedDashboard = cache.get<any>("dashboard_data");
+      if (cachedDashboard && result && result.is_first_of_day) {
+        cachedDashboard.stats = {
+          ...cachedDashboard.stats,
+          streak: result.new_streak,
+          xp: result.new_xp,
+          level: result.new_level,
+          total_sessions: result.total_sessions
+        };
+        cachedDashboard.workoutsThisWeek = (cachedDashboard.workoutsThisWeek || 0) + 1;
+        cache.set("dashboard_data", cachedDashboard);
+      }
+
       setWorkoutStarted(false);
       setCompletedExercises([]);
       setSessionLogs({});

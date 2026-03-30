@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import * as Icons from "lucide-react";
 import type { Badge } from "@/data/mockData";
 import { useAuth } from "@/contexts/AuthContext";
+import { cache } from "@/lib/cache";
 
 const formatIconName = (name: string) => {
   if (!name) return "Trophy";
@@ -44,6 +45,21 @@ export default function Profile() {
   const [unlockedBadges, setUnlockedBadges] = useState<Badge[]>([]);
   const [loadingBadges, setLoadingBadges] = useState(true);
 
+  useEffect(() => {
+    // 1. Optimistic UI: Carregar dados do cache
+    const cachedMeasurements = cache.get<any[]>("profile_measurements");
+    if (cachedMeasurements && cachedMeasurements.length > 0) {
+      setAllMeasurements(cachedMeasurements);
+      setMeasurements(cachedMeasurements[cachedMeasurements.length - 1]);
+      setPreviousMeasurement(cachedMeasurements.length > 1 ? cachedMeasurements[cachedMeasurements.length - 2] : null);
+    }
+
+    if (user) {
+      loadMeasurements();
+      fetchUserData();
+    }
+  }, [user]);
+
   const loadMeasurements = async () => {
     if (!user) {
       setLoading(false);
@@ -60,6 +76,7 @@ export default function Profile() {
       setAllMeasurements(data);
       setMeasurements(data[data.length - 1]);
       setPreviousMeasurement(data.length > 1 ? data[data.length - 2] : null);
+      cache.set("profile_measurements", data);
     }
     setLoading(false);
   };
@@ -112,13 +129,6 @@ export default function Profile() {
     }
     setLoadingBadges(false);
   };
-
-  useEffect(() => {
-    if (user) {
-      loadMeasurements();
-      fetchUserData();
-    }
-  }, [user]);
 
   const handleUpdateProfile = async () => {
     const { data: { session } } = await supabase.auth.getSession();

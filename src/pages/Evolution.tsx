@@ -6,6 +6,8 @@ import { TrendingUp, Loader2, Dumbbell } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { motion, AnimatePresence } from "framer-motion";
 
+import { cache } from "@/lib/cache";
+
 export default function Evolution() {
   const { user } = useAuth();
   
@@ -18,6 +20,19 @@ export default function Evolution() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    // Optimistic UI: Carregar do cache imediatamente
+    const cachedWorkouts = cache.get<{ id: string; name: string }[]>("evolution_workouts");
+    if (cachedWorkouts) {
+      setWorkouts(cachedWorkouts);
+      const firstId = cachedWorkouts[0].id;
+      setSelectedWorkoutId(firstId);
+      
+      const cachedCharts = cache.get<Record<string, { name: string; data: any[] }>>(`evolution_chart_${firstId}`);
+      if (cachedCharts) {
+        setChartData(cachedCharts);
+      }
+    }
+
     async function init() {
       if (!user?.id) return;
       setLoading(true);
@@ -32,6 +47,7 @@ export default function Evolution() {
         
         if (workoutsData && workoutsData.length > 0) {
           setWorkouts(workoutsData);
+          cache.set("evolution_workouts", workoutsData);
           const firstId = workoutsData[0].id;
           setSelectedWorkoutId(firstId);
           await loadProgressionData(firstId, user.id);
@@ -70,6 +86,7 @@ export default function Evolution() {
         });
       }
       setChartData(grouped);
+      cache.set(`evolution_chart_${workoutId}`, grouped);
     } catch (err) {
       console.error("Progression fetch error:", err);
     }
