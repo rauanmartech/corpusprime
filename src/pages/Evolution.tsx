@@ -20,37 +20,40 @@ export default function Evolution() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // Optimistic UI: Carregar do cache imediatamente
-    const cachedWorkouts = cache.get<{ id: string; name: string }[]>("evolution_workouts");
+    if (!user?.id) return;
+    const userId = user.id;
+
+    // Optimistic UI: Carregar do cache imediatamente (chave por usuário para isolamento)
+    const cachedWorkouts = cache.get<{ id: string; name: string }[]>(`evolution_workouts_${userId}`);
     if (cachedWorkouts) {
       setWorkouts(cachedWorkouts);
       const firstId = cachedWorkouts[0].id;
       setSelectedWorkoutId(firstId);
       
-      const cachedCharts = cache.get<Record<string, { name: string; data: any[] }>>(`evolution_chart_${firstId}`);
+      const cachedCharts = cache.get<Record<string, { name: string; data: any[] }>>(`evolution_chart_${firstId}_${userId}`);
       if (cachedCharts) {
         setChartData(cachedCharts);
       }
     }
 
     async function init() {
-      if (!user?.id) return;
       setLoading(true);
       try {
         const { data: workoutsData, error: wError } = await supabase
           .from('workouts')
           .select('id, name')
-          .eq('user_id', user.id)
+          .eq('user_id', userId)
           .order('created_at', { ascending: true });
 
         if (wError) throw wError;
         
         if (workoutsData && workoutsData.length > 0) {
           setWorkouts(workoutsData);
-          cache.set("evolution_workouts", workoutsData);
-          const firstId = workoutsData[0].id;
-          setSelectedWorkoutId(firstId);
-          await loadProgressionData(firstId, user.id);
+          cache.set(`evolution_workouts_${userId}`, workoutsData);
+          // Prioridade para o workout selecionado ou o primeiro
+          const targetId = selectedWorkoutId || workoutsData[0].id;
+          if (!selectedWorkoutId) setSelectedWorkoutId(targetId);
+          await loadProgressionData(targetId, userId);
         } else {
           setWorkouts([]);
         }
@@ -86,7 +89,7 @@ export default function Evolution() {
         });
       }
       setChartData(grouped);
-      cache.set(`evolution_chart_${workoutId}`, grouped);
+      cache.set(`evolution_chart_${workoutId}_${userId}`, grouped);
     } catch (err) {
       console.error("Progression fetch error:", err);
     }

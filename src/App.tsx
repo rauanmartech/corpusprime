@@ -13,6 +13,7 @@ import Social from "./pages/Social";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
+import EmailConfirmed from "./pages/EmailConfirmed";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { PWAInstallBanner } from "./components/PWAInstallBanner";
@@ -22,7 +23,7 @@ const queryClient = new QueryClient();
 // Create a functional component to use `useLocation` for the App Layout
 const MainLayout = () => {
   const location = useLocation();
-  const hideNav = location.pathname === '/auth';
+  const hideNav = ['/auth', '/email-confirmed'].includes(location.pathname);
 
   // Performance: Asset Preloading (Splash/Startup)
   useEffect(() => {
@@ -42,6 +43,7 @@ const MainLayout = () => {
     <div className="max-w-lg mx-auto relative min-h-[100dvh]">
       <Routes>
         <Route path="/auth" element={<Auth />} />
+        <Route path="/email-confirmed" element={<EmailConfirmed />} />
         
         {/* Protected Routes */}
         <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />

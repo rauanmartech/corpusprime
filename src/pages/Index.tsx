@@ -31,8 +31,11 @@ export default function Index() {
   });
 
   useEffect(() => {
+    if (!user?.id) return;
+    const userId = user.id;
+
     // Camada de Cache Otimista: Tentar carregar dados instantaneamente
-    const cached = cache.get<any>("dashboard_data");
+    const cached = cache.get<any>(`dashboard_data_${userId}`);
     if (cached) {
       setProfile(cached.profile);
       setStats(cached.stats);
@@ -46,10 +49,10 @@ export default function Index() {
     }
     
     fetchDashboardData();
-  }, [user]);
+  }, [user?.id]);
 
   const fetchDashboardData = async () => {
-    if (!user) return;
+    if (!user?.id) return;
     const userId = user.id;
 
     try {
@@ -59,7 +62,7 @@ export default function Index() {
       // 2. Fetch User Stats
       const { data: statsData } = await supabase.from('user_stats').select('*').eq('user_id', userId).single();
 
-      // 3. Ranking total
+      // 3. Ranking total (Público, mas filtrado logicamente)
       const { data: allStats } = await supabase.from('user_stats').select('user_id, xp').order('xp', { ascending: false });
       const userRank = allStats?.findIndex(s => s.user_id === userId) + 1;
 
@@ -150,8 +153,8 @@ export default function Index() {
       setWorkoutsThisWeek(dashboardData.workoutsThisWeek);
       setTodayWorkout(dashboardData.todayWorkout);
       
-      // Update Cache
-      cache.set("dashboard_data", dashboardData);
+      // Update Cache (Chave por usuário)
+      cache.set(`dashboard_data_${userId}`, dashboardData);
       
     } catch (e) {
       console.error("Dashboard fetch error:", e);

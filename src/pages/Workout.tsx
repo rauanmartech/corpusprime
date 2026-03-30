@@ -75,21 +75,22 @@ export default function Workout() {
 
   // Autenticação & Carregamento Inicial
   useEffect(() => {
-    // 1. Optimistic UI: Carregar dados do cache instantaneamente
-    const cachedWorkouts = cache.get<DBWorkout[]>("workout_list");
-    const cachedSchedule = cache.get<DBWeeklySchedule[]>("weekly_schedule");
-    if (cachedWorkouts) setWorkouts(cachedWorkouts);
-    if (cachedSchedule) setSchedule(cachedSchedule);
-    
-    if (user) {
-      fetchWorkouts(user.id);
+    if (user?.id) {
+      const userId = user.id;
+      // 1. Optimistic UI: Carregar dados do cache instantaneamente
+      const cachedWorkouts = cache.get<DBWorkout[]>(`workout_list_${userId}`);
+      const cachedSchedule = cache.get<DBWeeklySchedule[]>(`weekly_schedule_${userId}`);
+      if (cachedWorkouts) setWorkouts(cachedWorkouts);
+      if (cachedSchedule) setSchedule(cachedSchedule);
+      
+      fetchWorkouts(userId);
       
       // 2. Predictive Navigation: Pré-carregar dados da aba Evolução em background
-      prefetchEvolution(user.id);
+      prefetchEvolution(userId);
     } else {
       setLoading(false);
     }
-  }, [user]);
+  }, [user?.id]);
 
   const prefetchEvolution = async (userId: string) => {
     try {
@@ -101,7 +102,7 @@ export default function Workout() {
          .order('created_at', { ascending: true });
        
        if (evolutionWorkouts) {
-         cache.set("evolution_workouts", evolutionWorkouts);
+         cache.set(`evolution_workouts_${userId}`, evolutionWorkouts);
          // Puxa os dados do gráfico da primeira ficha (mais provável ser visualizada)
          if (evolutionWorkouts.length > 0) {
            const firstId = evolutionWorkouts[0].id;
@@ -122,7 +123,7 @@ export default function Workout() {
                const formattedDate = dateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
                grouped[row.exercise_id].data.push({ date: formattedDate, weight: Number(row.max_weight) });
              });
-             cache.set(`evolution_chart_${firstId}`, grouped);
+             cache.set(`evolution_chart_${firstId}_${userId}`, grouped);
            }
          }
        }
@@ -131,52 +132,56 @@ export default function Workout() {
 
   const fetchWorkouts = async (userId: string) => {
     setLoading(true);
-    const [workoutsRes, scheduleRes] = await Promise.all([
-      supabase.from('workouts').select('*').order('created_at', { ascending: true }),
-      supabase.from('weekly_schedule').select('*').eq('user_id', userId)
-    ]);
+    try {
+      const [workoutsRes, scheduleRes] = await Promise.all([
+        supabase.from('workouts').select('*').eq('user_id', userId).order('created_at', { ascending: true }),
+        supabase.from('weekly_schedule').select('*').eq('user_id', userId)
+      ]);
 
-    if (workoutsRes.error) toast.error("Erro ao puxar treinos.");
-    else {
-      setWorkouts(workoutsRes.data || []);
-      cache.set("workout_list", workoutsRes.data);
-    }
+      if (workoutsRes.error) toast.error("Erro ao puxar treinos.");
+      else {
+        setWorkouts(workoutsRes.data || []);
+        cache.set(`workout_list_${userId}`, workoutsRes.data);
+      }
 
-    if (scheduleRes.error) {
-      toast.error("Erro ao puxar agenda.");
-    } else {
-      setSchedule(scheduleRes.data || []);
-      cache.set("weekly_schedule", scheduleRes.data);
-      const today = new Date().getDay();
-      const todaySched = scheduleRes.data?.find(s => s.day_of_week === today);
-      if (todaySched && workoutsRes.data) {
-        const w = workoutsRes.data.find(wr => wr.id === todaySched.workout_id);
-        if (w) {
-          setTodayWorkout(w);
-          const { data: excs } = await supabase.from('exercises').select('*').eq('workout_id', w.id).order('order_index');
-          setTodayExercises(excs || []);
-        }
+      if (scheduleRes.error) {
+        toast.error("Erro ao puxar agenda.");
       } else {
-        setTodayWorkout(null);
-        setTodayExercises([]);
-      }
-      
-      // Se viemos do Histórico com um workoutId no state
-      const state = location.state as { workoutId?: string };
-      if (state?.workoutId && workoutsRes.data) {
-        const found = workoutsRes.data.find(w => w.id === state.workoutId);
-        if (found) {
-          setActiveTab("fichas");
-          setActiveWorkout(found);
-          setLoadingExercises(true);
-          const { data: excs } = await supabase.from('exercises').select('*').eq('workout_id', found.id).order('order_index');
-          setExercises(excs || []);
-          setLoadingExercises(false);
+        setSchedule(scheduleRes.data || []);
+        cache.set(`weekly_schedule_${userId}`, scheduleRes.data);
+        const today = new Date().getDay();
+        const todaySched = scheduleRes.data?.find(s => s.day_of_week === today);
+        if (todaySched && workoutsRes.data) {
+          const w = workoutsRes.data.find(wr => wr.id === todaySched.workout_id);
+          if (w) {
+            setTodayWorkout(w);
+            const { data: excs } = await supabase.from('exercises').select('*').eq('workout_id', w.id).order('order_index');
+            setTodayExercises(excs || []);
+          }
+        } else {
+          setTodayWorkout(null);
+          setTodayExercises([]);
+        }
+        
+        // Se viemos do Histórico com um workoutId no state
+        const state = location.state as { workoutId?: string };
+        if (state?.workoutId && workoutsRes.data) {
+          const found = workoutsRes.data.find(w => w.id === state.workoutId);
+          if (found) {
+            setActiveTab("fichas");
+            setActiveWorkout(found);
+            setLoadingExercises(true);
+            const { data: excs } = await supabase.from('exercises').select('*').eq('workout_id', found.id).order('order_index');
+            setExercises(excs || []);
+            setLoadingExercises(false);
+          }
         }
       }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   // Função de Atualização de Set Log
@@ -529,7 +534,7 @@ export default function Workout() {
       toast.success("Treino Finalizado com Sucesso! 💪🔥");
       
       // Update Dashboard Cache Optimistically
-      const cachedDashboard = cache.get<any>("dashboard_data");
+      const cachedDashboard = cache.get<any>(`dashboard_data_${session.user.id}`);
       if (cachedDashboard && result && result.is_first_of_day) {
         cachedDashboard.stats = {
           ...cachedDashboard.stats,
@@ -539,7 +544,7 @@ export default function Workout() {
           total_sessions: result.total_sessions
         };
         cachedDashboard.workoutsThisWeek = (cachedDashboard.workoutsThisWeek || 0) + 1;
-        cache.set("dashboard_data", cachedDashboard);
+        cache.set(`dashboard_data_${session.user.id}`, cachedDashboard);
       }
 
       setWorkoutStarted(false);

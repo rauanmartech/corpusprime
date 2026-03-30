@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/lib/supabase";
 import { useNavigate, useLocation, Navigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -15,6 +15,8 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   // Determine where to redirect after successful login
   const from = location.state?.from?.pathname || "/";
@@ -46,18 +48,26 @@ export default function Auth() {
         // o que vai acionar automaticamente o <Navigate> no topo deste componente.
       }
     } else if (activeTab === "register") {
+      if (password !== confirmPassword) {
+        toast.error("As senhas não coincidem.");
+        setLoading(false);
+        return;
+      }
+      
       const { error: signUpError } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          emailRedirectTo: 'https://corpusprime.vercel.app/email-confirmed',
+        }
       });
       error = signUpError;
       if (!error) {
-        toast.success("Conta criada! Você já pode entrar.");
-        setActiveTab("login");
+        setShowSuccessModal(true);
       }
     } else if (activeTab === "forgot") {
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.origin + '/auth',
+        redirectTo: 'https://corpusprime.vercel.app/auth',
       });
       error = resetError;
       if (!error) {
@@ -191,6 +201,33 @@ export default function Auth() {
               </div>
             )}
 
+            {activeTab === "register" && (
+              <div className="space-y-1.5">
+                <label className="text-[11px] uppercase font-semibold text-muted-foreground tracking-wider ml-1">
+                  Confirmar Senha
+                </label>
+                <div className="relative">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                    <KeyRound size={18} strokeWidth={1.5} />
+                  </div>
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Repita sua senha"
+                    className={`w-full bg-muted/40 border rounded-xl pl-10 pr-4 py-3 text-sm outline-none transition-colors font-medium ${
+                      confirmPassword && password !== confirmPassword 
+                        ? "border-red-500/50 focus:border-red-500" 
+                        : "border-border/40 focus:border-foreground"
+                    }`}
+                  />
+                </div>
+                {confirmPassword && password !== confirmPassword && (
+                  <p className="text-[10px] text-red-500 font-medium ml-1">As senhas não coincidem</p>
+                )}
+              </div>
+            )}
+
             <button
               type="submit"
               disabled={loading}
@@ -218,6 +255,39 @@ export default function Auth() {
           </form>
         </div>
       </motion.div>
+
+      {/* Registration Success Modal */}
+      <AnimatePresence>
+        {showSuccessModal && (
+          <motion.div 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-background/80 backdrop-blur-sm"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+              className="bg-card border border-border/40 p-8 rounded-[2rem] max-w-sm w-full text-center shadow-2xl"
+            >
+              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Mail className="text-primary w-8 h-8" />
+              </div>
+              <h2 className="text-2xl font-display font-bold text-foreground mb-3">Verifique seu E-mail</h2>
+              <p className="text-sm text-muted-foreground mb-8">
+                Enviamos um link de confirmação para <span className="text-foreground font-bold">{email}</span>. 
+                Por favor, valide sua conta para começar a treinar.
+              </p>
+              <button
+                onClick={() => {
+                  setShowSuccessModal(false);
+                  setActiveTab("login");
+                }}
+                className="w-full bg-foreground text-background py-4 rounded-2xl font-bold hover:opacity-90 transition-all"
+              >
+                Entendi, ir para o Login
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -40,20 +40,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setUser(session?.user ?? null);
 
       if (session?.user) {
-        // Busca o perfil de forma não-bloqueante (sem async/await para evitar lock)
-        supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single()
-          .then(({ data }) => {
+        // Busca o perfil de forma assíncrona
+        const fetchProfile = async () => {
+          try {
+            const { data, error } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', session.user.id)
+              .single();
+            
+            if (error) throw error;
             if (data) setProfile(data);
-          })
-          .catch((err) => console.error('Profile fetch error:', err))
-          .finally(() => {
+          } catch (err) {
+            console.error('Profile fetch error:', err);
+          } finally {
             clearTimeout(safetyTimeout);
             setLoading(false);
-          });
+          }
+        };
+        fetchProfile();
       } else {
         setProfile(null);
         clearTimeout(safetyTimeout);
@@ -72,6 +77,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const { error } = await supabase.auth.signOut();
       if (error) {
         toast.error('Erro ao sair da conta.');
+      } else {
+        // Limpeza total de Cache e Sessão imediatamente após o logout
+        import('@/lib/cache').then(({ cache }) => {
+          cache.clear();
+          localStorage.clear();
+          sessionStorage.clear();
+        });
+        setProfile(null);
+        setUser(null);
+        toast.success('Sessão encerrada com segurança.');
       }
     } catch (e) {
       console.error(e);
