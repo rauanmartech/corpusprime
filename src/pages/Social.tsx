@@ -5,6 +5,8 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import * as Icons from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import { PullToRefreshIndicator } from "@/components/PullToRefreshIndicator";
 
 const formatIconName = (name: string) => {
   if (!name) return "Trophy";
@@ -33,6 +35,13 @@ export default function Social() {
   const [hasMore, setHasMore] = useState(true);
   const [fetchingMore, setFetchingMore] = useState(false);
   const PAGE_SIZE = 5;
+
+  // Pull to Refresh
+  const { pullProgress, refreshing: ptRefreshing } = usePullToRefresh({
+    onRefresh: async () => {
+      await fetchEvents(0);
+    }
+  });
 
   useEffect(() => {
     fetchEvents(0);
@@ -125,6 +134,7 @@ export default function Social() {
 
   return (
     <div className="min-h-screen bg-background pb-24">
+      <PullToRefreshIndicator pullProgress={pullProgress} refreshing={ptRefreshing} />
       {/* Header */}
       <div className="px-5 pt-12 pb-6 flex items-center justify-between sticky top-0 bg-background/80 backdrop-blur-lg z-20">
         <div className="flex items-center gap-4">

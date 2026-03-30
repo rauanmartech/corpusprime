@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import BottomNav from "@/components/BottomNav";
 import Index from "./pages/Index";
 import Workout from "./pages/Workout";
+import Evolution from "./pages/Evolution";
 import Badges from "./pages/Badges";
 import Social from "./pages/Social";
 import Profile from "./pages/Profile";
@@ -30,6 +31,7 @@ const MainLayout = () => {
         {/* Protected Routes */}
         <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
         <Route path="/workout" element={<ProtectedRoute><Workout /></ProtectedRoute>} />
+        <Route path="/evolution" element={<ProtectedRoute><Evolution /></ProtectedRoute>} />
         <Route path="/badges" element={<ProtectedRoute><Badges /></ProtectedRoute>} />
         <Route path="/social" element={<ProtectedRoute><Social /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />

@@ -1,10 +1,11 @@
-import { Home, Dumbbell, Trophy, User, Users } from "lucide-react";
+import { Home, Dumbbell, Trophy, User, Users, TrendingUp } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 
 const navItems = [
   { path: "/", icon: Home, label: "Início" },
   { path: "/workout", icon: Dumbbell, label: "Treino" },
+  { path: "/evolution", icon: TrendingUp, label: "Evolução" },
   { path: "/social", icon: Users, label: "Social" },
   { path: "/badges", icon: Trophy, label: "Conquistas" },
   { path: "/profile", icon: User, label: "Perfil" },

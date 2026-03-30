@@ -7,6 +7,8 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { checkAndAwardAchievements } from "@/lib/achievements";
 import { cache } from "@/lib/cache";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import { PullToRefreshIndicator } from "@/components/PullToRefreshIndicator";
 
 // Tipagens do Banco
 type DBWorkout = { id: string; name: string };
@@ -44,6 +46,10 @@ export default function Workout() {
   const [completedExercises, setCompletedExercises] = useState<string[]>([]);
   const [workoutStarted, setWorkoutStarted] = useState(false);
   const [finishingWorkout, setFinishingWorkout] = useState(false);
+  const [hasHydrated, setHasHydrated] = useState(false);
+  const [sessionLogs, setSessionLogs] = useState<Record<string, { weight: number, reps: number, completed: boolean }[]>>({});
+  const [expandedExerciseId, setExpandedExerciseId] = useState<string | null>(null);
+  const [showExitModal, setShowExitModal] = useState(false);
 
   // Formulários Treino
   const [showNewWorkout, setShowNewWorkout] = useState(false);
@@ -59,6 +65,13 @@ export default function Workout() {
   // Edição de Exercícios
   const [editingExerciseId, setEditingExerciseId] = useState<string | null>(null);
   const [editExerciseData, setEditExerciseData] = useState({ name: "", weight: 0, sets: 3, reps: 10, weightNA: false, repsNA: false });
+
+  // Pull to Refresh
+  const { pullProgress, refreshing: ptRefreshing } = usePullToRefresh({
+    onRefresh: async () => {
+      if (user) await fetchWorkouts(user.id);
+    }
+  });
 
   // Autenticação & Carregamento Inicial
   useEffect(() => {
@@ -115,80 +128,80 @@ export default function Workout() {
     setLoading(false);
   };
 
-  // Função de Atualização Otimista para Pesos/Reps
-  const updateExerciseOptimistically = async (id: string, field: 'weight' | 'reps', value: number) => {
-    // 1. Atualizar UI imediatamente (Optimistic UI)
-    const updatedExercises = todayExercises.map(ex => 
-      ex.id === id ? { ...ex, [field]: value } : ex
-    );
-    setTodayExercises(updatedExercises);
-
-    // 2. Persistir localmente para redundância
-    cache.set(`workout_state_${todayWorkout?.id}`, {
-      started: workoutStarted,
-      completed: completedExercises,
-      exercises: updatedExercises
-    });
-
-    // 3. Sincronizar com o banco em background (High Availability)
-    try {
-      const { error } = await supabase
-        .from('exercises')
-        .update({ [field]: value })
-        .eq('id', id);
+  // Função de Atualização de Set Log
+  const updateSetLog = (exerciseId: string, setIndex: number, field: 'weight' | 'reps' | 'completed', value: number | boolean) => {
+    setSessionLogs(prev => {
+      const currentLogs = [...(prev[exerciseId] || [])];
+      currentLogs[setIndex] = { ...currentLogs[setIndex], [field]: value };
+      const newSessionLogs = { ...prev, [exerciseId]: currentLogs };
       
-      if (error) throw error;
-    } catch (err) {
-      console.warn("Sync failed, retrying in 5s...", err);
-      // Notificação silenciosa/discreta (vibrar ou toast pequeno se necessário)
-      setTimeout(() => updateExerciseOptimistically(id, field, value), 5000);
-    }
+      if (field === 'completed' && value === true) {
+        const allSetsCompleted = currentLogs.every(s => s.completed);
+        if (allSetsCompleted) {
+          const currentIndex = todayExercises.findIndex(ex => ex.id === exerciseId);
+          if (currentIndex !== -1 && currentIndex < todayExercises.length - 1) {
+            setTimeout(() => setExpandedExerciseId(todayExercises[currentIndex + 1].id), 300);
+          } else if (allSetsCompleted) {
+            setTimeout(() => setExpandedExerciseId(null), 300);
+          }
+        }
+      }
+      return newSessionLogs;
+    });
   };
 
-  // Dentro do map dos exercícios (Hoje):
-  const renderExerciseInputs = (exc: DBExercise, isDone: boolean) => (
-    <div className={`flex items-center gap-3 text-sm mt-1 ${isDone ? "opacity-60" : ""} font-medium`}>
-      <span>{exc.sets} séries</span>
-      <span>•</span>
-      <div className="flex items-center gap-1 bg-muted/30 px-2 py-0.5 rounded-md border border-border/10">
-        <input 
-          type="number" 
-          value={exc.reps || 0} 
-          disabled={isDone}
-          onChange={(e) => updateExerciseOptimistically(exc.id, 'reps', Number(e.target.value))}
-          className="w-10 bg-transparent text-foreground outline-none text-center"
-        />
-        <span className="text-[10px] text-muted-foreground">REPS</span>
-      </div>
-      <span>•</span>
-      <div className="flex items-center gap-1 bg-muted/30 px-2 py-0.5 rounded-md border border-border/10">
-        <input 
-          type="number" 
-          step="0.5"
-          value={exc.weight || 0} 
-          disabled={isDone}
-          onChange={(e) => updateExerciseOptimistically(exc.id, 'weight', Number(e.target.value))}
-          className="w-12 bg-transparent text-foreground outline-none text-center"
-        />
-        <span className="text-[10px] text-muted-foreground">KG</span>
-      </div>
-    </div>
-  );
+  // 4. Hydration: Restaurar estado do rascunho de hoje via localStorage
+  useEffect(() => {
+    if (todayWorkout && todayExercises.length > 0 && !hasHydrated) {
+      const saved = localStorage.getItem('evolve_workout_state');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          const todayStr = new Date().toISOString().split('T')[0];
+          if (parsed.date === todayStr && parsed.workoutId === todayWorkout.id) {
+            setWorkoutStarted(parsed.started || false);
+            if (parsed.sessionLogs) setSessionLogs(parsed.sessionLogs);
+            else setCompletedExercises(parsed.completed || []);
+          } else {
+            localStorage.removeItem('evolve_workout_state');
+          }
+        } catch(e) {}
+      }
+      setHasHydrated(true);
+    }
+  }, [todayWorkout, todayExercises, hasHydrated]);
 
-  // Persistência de Andamento do Treino (Salvar)
+  // Persistência Atômica do Andamento (Salvar Offline e Sync Background)
   useEffect(() => {
     if (todayWorkout) {
       const todayStr = new Date().toISOString().split('T')[0];
-      if (workoutStarted || completedExercises.length > 0) {
-        localStorage.setItem('evolve_workout_state', JSON.stringify({
-          date: todayStr,
-          workoutId: todayWorkout.id,
-          started: workoutStarted,
-          completed: completedExercises
-        }));
+      const draftPayload = {
+        date: todayStr,
+        workoutId: todayWorkout.id,
+        started: workoutStarted,
+        sessionLogs: sessionLogs
+      };
+
+      if (workoutStarted || Object.keys(sessionLogs).length > 0) {
+        localStorage.setItem('evolve_workout_state', JSON.stringify(draftPayload));
+        
+        if (session?.user) {
+          supabase.from('workout_drafts').upsert({
+            user_id: session.user.id,
+            workout_id: todayWorkout.id,
+            payload: draftPayload,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'user_id,workout_id' }).then(({ error }) => {
+            if (error && error.code !== '42P01') console.warn("Draft sync error:", error.message);
+          });
+        }
       }
     }
-  }, [workoutStarted, completedExercises, todayWorkout]);
+  }, [workoutStarted, sessionLogs, todayWorkout, session]);
+
+  const handleCancelWorkout = () => {
+    setShowExitModal(true);
+  };
 
   const loadExercises = async (workout: DBWorkout) => {
     setLoadingExercises(true);
@@ -325,93 +338,133 @@ export default function Workout() {
     });
   };
 
-  const toggleExerciseCheck = (id: string) => {
-    if (completedExercises.includes(id)) {
-      setCompletedExercises(completedExercises.filter(e => e !== id));
-    } else {
-      setCompletedExercises([...completedExercises, id]);
+  const handleStartWorkout = () => {
+    setWorkoutStarted(true);
+    if (Object.keys(sessionLogs).length === 0) {
+      const initialLogs: Record<string, { weight: number, reps: number, completed: boolean }[]> = {};
+      todayExercises.forEach(ex => {
+        initialLogs[ex.id] = Array.from({ length: ex.sets }, () => ({
+          weight: ex.weight || 0,
+          reps: ex.reps || 0,
+          completed: false
+        }));
+      });
+      setSessionLogs(initialLogs);
+      if (todayExercises.length > 0) {
+        setExpandedExerciseId(todayExercises[0].id);
+      }
     }
   };
 
-  const handleFinishWorkout = async () => {
+  const processFinishWorkout = async (updateTemplates: boolean) => {
     if (!todayWorkout || !session) return;
     setFinishingWorkout(true);
+    setShowExitModal(false);
     try {
       const todayStr = new Date().toISOString().split('T')[0];
       
-      // 1. Check if already done today to avoid double counting streak
-      const { data: doneToday } = await supabase
-        .from('workout_history')
-        .select('id')
-        .eq('user_id', session.user.id)
-        .gte('completed_at', todayStr + 'T00:00:00')
-        .single();
+      // 0. Sincronização de Carga Adaptativa (Post-Workout Sync)
+      if (updateTemplates && Object.keys(sessionLogs).length > 0) {
+        const updatePromises = todayExercises.map(ex => {
+          const logs = sessionLogs[ex.id];
+          if (!logs) return null;
+          const completedSets = logs.filter(s => s.completed);
+          if (completedSets.length > 0) {
+            // Progression: capturar a maior carga usada e gravá-la no blueprint
+            const bestSet = completedSets.reduce((prev, current) => (current.weight > prev.weight) ? current : prev);
+            return supabase.from('exercises').update({ weight: bestSet.weight, reps: bestSet.reps }).eq('id', ex.id);
+          }
+          return null;
+        }).filter(Boolean);
+        
+        // Dispara as atualizações da ficha mestre
+        await Promise.all(updatePromises);
+      }
 
-      // 2. Insert to history
-      await supabase.from('workout_history').insert([{
+      // 1. Insert to history (Garante que o log da sessão fica salvo)
+      const { data: historyData, error: historyError } = await supabase.from('workout_history').insert([{
         user_id: session.user.id,
         workout_id: todayWorkout.id
-      }]);
+      }]).select('id').single();
 
-      // 3. Update Streak & XP if it's the first workout of the day
-      if (!doneToday) {
-        const { data: stats } = await supabase
-          .from('user_stats')
-          .select('streak, xp, total_sessions, level')
-          .eq('user_id', session.user.id)
-          .single();
+      if (historyError) throw historyError;
 
-        const currentStreak = stats?.streak || 0;
-        const currentXP = stats?.xp || 0;
-        const currentLevel = stats?.level || 1;
-        const currentTotal = stats?.total_sessions || 0;
+      // 1.5. Inserir Logs individuais das séries em alta escala (Epley Formula)
+      if (historyData?.id && Object.keys(sessionLogs).length > 0) {
+        const logsToInsert = [];
+        for (const [exerciseId, sets] of Object.entries(sessionLogs)) {
+           for (const set of sets) {
+              if (set.completed) {
+                logsToInsert.push({
+                   history_id: historyData.id,
+                   exercise_id: exerciseId,
+                   weight: set.weight,
+                   reps: set.reps
+                });
+              }
+           }
+        }
+        if (logsToInsert.length > 0) {
+           await supabase.from('workout_logs').insert(logsToInsert).then(({ error }) => {
+              if (error && error.code !== '42P01') console.warn("Workout Logs Insert Error:", error.message);
+           });
+        }
+      }
+
+      // 2. Chamar o RPC de processamento atômico Diário/Streak (Zero Race Condition)
+      const { data: rpcResult, error: rpcError } = await supabase.rpc('process_workout_completion', {
+        p_user_id: session.user.id,
+        p_client_date: todayStr
+      });
+
+      if (rpcError) throw rpcError;
+
+      // Type Assert para objeto JSONB real do RPC
+      const result = rpcResult as unknown as { 
+        new_streak: number; 
+        new_xp: number; 
+        new_level: number; 
+        total_sessions: number; 
+        is_first_of_day: boolean 
+      };
+
+      // 3. Update Visual e Conquistas, apenas se for primeiro do dia (Ganhou XP/Sequência)
+      if (result && result.is_first_of_day) {
         
-        const newXP = currentXP + 150;
-        const newLevel = Math.floor(newXP / 1500) + 1;
-
-        await supabase.from('user_stats').update({
-          streak: currentStreak + 1,
-          total_sessions: currentTotal + 1,
-          xp: newXP,
-          level: newLevel,
-          last_sync_date: todayStr
-        }).eq('user_id', session.user.id);
-
-        // --- NOVO: Registrar na Comunidade ---
-        const newStreak = currentStreak + 1;
-        
+        // --- Registrar Timeline na Comunidade ---
         // 1. Evento de Treino
         await supabase.from('community_events').insert([{
           user_id: session.user.id,
           event_type: 'workout',
           title: `Finalizou o treino: ${todayWorkout.name}`,
-          description: `Completou sua ${currentTotal + 1}ª sessão de treino! 🔥`,
+          description: `Completou sua ${result.total_sessions}ª sessão de treino! 🔥`,
           metadata: {
             workout_name: todayWorkout.name,
-            total_sessions: currentTotal + 1
+            total_sessions: result.total_sessions
           }
         }]);
 
-        // 2. Marcas de Streak (7, 14, 21, 30, 60, 90, 180, 365)
+        // 2. Marcas de Streak
         const milestones = [7, 14, 21, 30, 60, 90, 180, 365];
-        if (milestones.includes(newStreak)) {
-          let label = `${newStreak} dias`;
-          if (newStreak === 30) label = "1 mês";
-          if (newStreak === 60) label = "2 meses";
-          if (newStreak === 365) label = "1 ano";
+        if (milestones.includes(result.new_streak)) {
+          let label = `${result.new_streak} dias`;
+          if (result.new_streak === 30) label = "1 mês";
+          if (result.new_streak === 60) label = "2 meses";
+          if (result.new_streak === 365) label = "1 ano";
 
           await supabase.from('community_events').insert([{
             user_id: session.user.id,
             event_type: 'milestone',
             title: `MARCO ALCANÇADO: ${label}!`,
             description: `Manteve a chama acesa por ${label} consecutivos! 🚀`,
-            metadata: { streak: newStreak }
+            metadata: { streak: result.new_streak }
           }]);
         }
-        // -------------------------------------
 
-        if (newLevel > currentLevel) {
-          toast.success(`EVOLUÇÃO! Você subiu para o NÍVEL ${newLevel}! 🔥🧗‍♂️`, {
+        // 3. Toast Level Up (Se subiu de nível calculando o delta)
+        const currentLevel = Math.floor((result.new_xp - 150) / 1500) + 1;
+        if (result.new_level > currentLevel) {
+          toast.success(`EVOLUÇÃO! Você subiu para o NÍVEL ${result.new_level}! 🔥🧗‍♂️`, {
             duration: 8000,
             style: { background: 'var(--blood-red)', color: 'white', fontWeight: 'bold' }
           });
@@ -421,10 +474,16 @@ export default function Workout() {
         await checkAndAwardAchievements(session.user.id);
       }
 
+      // 5. Finalizar Limpeza Local e Cloud Draft
       toast.success("Treino Finalizado com Sucesso! 💪🔥");
       setWorkoutStarted(false);
       setCompletedExercises([]);
+      setSessionLogs({});
+      setExpandedExerciseId(null);
       localStorage.removeItem('evolve_workout_state');
+      if (todayWorkout) {
+        supabase.from('workout_drafts').delete().eq('user_id', session.user.id).eq('workout_id', todayWorkout.id).then();
+      }
     } catch (err) {
       console.error(err);
       toast.error("Erro ao salvar histórico.");
@@ -482,6 +541,7 @@ export default function Workout() {
 
   return (
     <div className="min-h-screen bg-background pb-24">
+      <PullToRefreshIndicator pullProgress={pullProgress} refreshing={ptRefreshing} />
       {/* Dynamic Header */}
       <div className="sticky top-0 z-40 bg-background/80 backdrop-blur-lg border-b border-border/60">
         <div className="flex items-center px-5 py-4 gap-4">
@@ -550,59 +610,162 @@ export default function Workout() {
                     </div>
                   ) : (
                     <>
-                      <div className="flex items-center justify-between mb-2">
-                        <h2 className="text-2xl font-display font-semibold text-foreground">{todayWorkout.name}</h2>
-                        {workoutStarted && (
-                          <span className="text-xs font-semibold px-3 py-1 bg-primary/10 text-primary rounded-full">
-                            {completedExercises.length}/{todayExercises.length} concluídos
-                          </span>
-                        )}
-                      </div>
+                      {(() => {
+                        const completedExsCount = todayExercises.filter(ex => sessionLogs[ex.id]?.length > 0 && sessionLogs[ex.id].every(s => s.completed)).length;
+                        const isWorkoutFinishedReady = completedExsCount === todayExercises.length && todayExercises.length > 0;
+                        return (
+                          <>
+                            <div className="flex items-center justify-between mb-2">
+                              <h2 className="text-2xl font-display font-semibold text-foreground">{todayWorkout.name}</h2>
+                              {workoutStarted && (
+                                <span className="text-xs font-semibold px-3 py-1 bg-primary/10 text-primary rounded-full">
+                                  {completedExsCount}/{todayExercises.length} concluídos
+                                </span>
+                              )}
+                            </div>
                       
                       <div className="space-y-3 mb-8">
                         {todayExercises.map((exc) => {
-                          const isDone = completedExercises.includes(exc.id);
+                          if (!workoutStarted) {
+                            return (
+                              <div key={exc.id} className="bg-card border border-border/40 rounded-2xl p-4 shadow-sm flex items-center gap-4">
+                                <div className="flex-1">
+                                  <p className="text-base font-black uppercase tracking-tight text-foreground">{exc.name}</p>
+                                  <div className="flex items-center gap-3 text-sm mt-1 font-medium">
+                                    <span>{exc.sets} séries</span>
+                                    <span>•</span>
+                                    <span>{exc.reps || 0} REPS</span>
+                                    <span>•</span>
+                                    <span>{exc.weight || 0} KG</span>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          const logs = sessionLogs[exc.id] || [];
+                          const isDone = logs.length > 0 && logs.every(s => s.completed);
+                          const isExpanded = expandedExerciseId === exc.id;
+
                           return (
                             <div 
                               key={exc.id} 
-                              onClick={() => workoutStarted && toggleExerciseCheck(exc.id)}
-                              className={`bg-card border ${workoutStarted && isDone ? "border-primary/50 bg-primary/5" : "border-border/40"} rounded-2xl p-4 shadow-sm flex items-center gap-4 transition-all ${workoutStarted ? "cursor-pointer active:scale-[0.98]" : ""}`}
+                              className={`bg-card border transition-all ${isDone ? "border-primary/50 bg-primary/5" : "border-border/40"} rounded-2xl p-4 shadow-sm flex flex-col gap-3`}
                             >
-                              {workoutStarted && (
-                                <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${isDone ? "text-primary" : "text-muted-foreground/40"}`}>
-                                  {isDone ? <CheckCircle2 size={24} className="fill-primary/20" /> : <Circle size={24} strokeWidth={1.5} />}
+                              <div 
+                                onClick={() => setExpandedExerciseId(isExpanded ? null : exc.id)}
+                                className="flex items-center gap-4 cursor-pointer"
+                              >
+                                <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${isDone ? "text-primary bg-primary/10" : "text-muted-foreground/40"}`}>
+                                  {isDone ? <CheckCircle2 size={16} /> : <Circle size={16} strokeWidth={1.5} />}
                                 </div>
-                              )}
-                              <div className="flex-1">
-                                <p className={`text-base font-black uppercase tracking-tight ${isDone ? "text-foreground line-through opacity-40" : "text-foreground"}`}>{exc.name}</p>
-                                {renderExerciseInputs(exc, isDone)}
+                                <div className="flex-1 flex items-center justify-between">
+                                  <p className={`text-base font-black uppercase tracking-tight ${isDone ? "text-foreground line-through opacity-40" : "text-foreground"}`}>
+                                    {exc.name}
+                                  </p>
+                                  <ChevronRight size={20} className={`text-muted-foreground transition-transform ${isExpanded ? "rotate-90" : ""}`} />
+                                </div>
                               </div>
+
+                              <AnimatePresence>
+                                {isExpanded && (
+                                  <motion.div 
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: "auto", opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    className="mt-2 space-y-2 overflow-hidden"
+                                  >
+                                    {logs.map((set, setIndex) => (
+                                      <div key={setIndex} className={`flex items-center gap-3 p-3 rounded-xl border ${set.completed ? "bg-primary/10 border-primary/20" : "bg-muted/30 border-border/10"} transition-colors`}>
+                                        <div className="w-8 text-center text-[10px] font-bold text-muted-foreground uppercase leading-tight">
+                                          Série<br/>{setIndex + 1}
+                                        </div>
+                                        
+                                        <div className="flex-1 flex gap-2">
+                                          <div className="flex-1 flex flex-col bg-background/50 rounded-lg p-1.5 focus-within:ring-1 ring-primary/30">
+                                            <span className="text-[9px] font-bold text-muted-foreground ml-1">KG</span>
+                                            <input 
+                                              type="number" 
+                                              value={set.weight || ''}
+                                              disabled={set.completed}
+                                              onChange={(e) => updateSetLog(exc.id, setIndex, 'weight', Number(e.target.value))}
+                                              className="bg-transparent text-sm font-semibold w-full outline-none px-1 text-center disabled:opacity-50"
+                                            />
+                                          </div>
+                                          <div className="flex-1 flex flex-col bg-background/50 rounded-lg p-1.5 focus-within:ring-1 ring-primary/30">
+                                            <span className="text-[9px] font-bold text-muted-foreground ml-1">REPS</span>
+                                            <input 
+                                              type="number" 
+                                              value={set.reps || ''}
+                                              disabled={set.completed}
+                                              onChange={(e) => updateSetLog(exc.id, setIndex, 'reps', Number(e.target.value))}
+                                              className="bg-transparent text-sm font-semibold w-full outline-none px-1 text-center disabled:opacity-50"
+                                            />
+                                          </div>
+                                        </div>
+
+                                        <button 
+                                          onClick={() => updateSetLog(exc.id, setIndex, 'completed', !set.completed)}
+                                          className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors shrink-0 ${set.completed ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-primary/20 hover:text-primary"}`}
+                                        >
+                                          <CheckCircle2 size={20} className={set.completed ? "fill-primary-foreground/20" : ""} />
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
                             </div>
-                          )
+                          );
                         })}
                       </div>
 
-                      {!workoutStarted ? (
-                        <button 
-                          onClick={() => setWorkoutStarted(true)} 
-                          className="w-full bg-foreground text-background py-4 rounded-2xl font-semibold shadow-elevated text-lg flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-transform"
+                      {/* Espaçador Dinâmico para o FAB não cobrir as últimas listas */}
+                      <div className="h-28"></div>
+
+                      <AnimatePresence>
+                        <motion.div 
+                          initial={{ y: 100, opacity: 0 }}
+                          animate={{ y: 0, opacity: 1 }}
+                          exit={{ y: 100, opacity: 0 }}
+                          className="fixed bottom-20 left-0 right-0 px-5 z-40 pointer-events-none"
                         >
-                          <Play size={20} fill="currentColor" /> Iniciar Treino
-                        </button>
-                      ) : (
-                        <button 
-                          onClick={handleFinishWorkout}
-                          disabled={completedExercises.length !== todayExercises.length || finishingWorkout}
-                          className={`w-full py-4 rounded-2xl font-semibold text-lg flex items-center justify-center gap-2 transition-all shadow-elevated
-                            ${completedExercises.length === todayExercises.length 
-                              ? "bg-primary text-primary-foreground hover:scale-[1.02] active:scale-[0.98]" 
-                              : "bg-muted text-muted-foreground opacity-60 cursor-not-allowed"
-                            }`}
-                        >
-                          {finishingWorkout ? <Loader2 className="animate-spin" /> : <CheckCircle2 size={20} />}
-                          Finalizar Treino
-                        </button>
-                      )}
+                          <div className="max-w-md mx-auto bg-background/80 backdrop-blur-xl border border-border/50 p-4 rounded-[32px] shadow-[0_8px_32px_rgba(0,0,0,0.12)] pointer-events-auto">
+                            {!workoutStarted ? (
+                              <button 
+                                onClick={handleStartWorkout} 
+                                className="w-full bg-primary text-primary-foreground py-4 rounded-3xl font-black uppercase tracking-widest shadow-[0_0_20px_rgba(255,59,48,0.3)] text-sm flex items-center justify-center gap-2 transition-transform hover:scale-[1.02] active:scale-[0.98]"
+                              >
+                                <Play size={18} fill="currentColor" /> COMEÇAR TREINO
+                              </button>
+                            ) : (
+                              <div className="flex gap-3">
+                                <button 
+                                  onClick={handleCancelWorkout}
+                                  className="w-14 h-14 bg-foreground border border-border/20 text-background hover:bg-destructive hover:text-destructive-foreground rounded-2xl transition-colors flex items-center justify-center shrink-0 shadow-sm"
+                                >
+                                  <Trash2 size={20} />
+                                </button>
+                                <button 
+                                  onClick={() => processFinishWorkout(true)}
+                                  disabled={!isWorkoutFinishedReady || finishingWorkout}
+                                  className={`flex-1 h-14 rounded-2xl font-black uppercase tracking-widest text-sm flex items-center justify-center gap-2 transition-all shadow-elevated
+                                    ${isWorkoutFinishedReady 
+                                      ? "bg-primary text-primary-foreground shadow-[0_0_20px_rgba(255,59,48,0.3)] hover:scale-[1.02] active:scale-[0.98]" 
+                                      : "bg-muted text-muted-foreground opacity-50 cursor-not-allowed"
+                                    }`}
+                                >
+                                  {finishingWorkout ? <Loader2 className="animate-spin" /> : <CheckCircle2 size={18} />}
+                                  {isWorkoutFinishedReady ? "FINALIZAR" : "EM ANDAMENTO"}
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </motion.div>
+                      </AnimatePresence>
+                          </>
+                        );
+                      })()}
                     </>
                   )}
                 </div>
@@ -950,6 +1113,54 @@ export default function Workout() {
           </motion.div>
         </div>
       )}
+
+      {/* Modal Premium de Saída Condicional */}
+      <AnimatePresence>
+        {showExitModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-5 bg-background/80 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="bg-card border border-border/50 rounded-3xl p-6 w-full max-w-sm shadow-2xl flex flex-col items-center text-center"
+            >
+              <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mb-4">
+                <Info size={28} className="text-destructive" />
+              </div>
+              <h3 className="text-xl font-display font-semibold text-foreground mb-2">Encerrar Sessão?</h3>
+              <p className="text-sm text-muted-foreground mb-8">
+                Você está prestes a sair sem finalizar todas as séries. Escolha como deseja tratar o progresso atingido:
+              </p>
+              
+              <div className="w-full space-y-3">
+                <button 
+                  onClick={() => processFinishWorkout(true)}
+                  disabled={finishingWorkout}
+                  className="w-full py-3.5 rounded-xl font-semibold bg-foreground text-background hover:scale-[1.02] active:scale-[0.98] transition-transform shadow-elevated disabled:opacity-50"
+                >
+                  Atualizar e Sair
+                  <span className="block text-[10px] font-normal opacity-70">Salva e transfere suas novas cargas para a Ficha</span>
+                </button>
+                <button 
+                  onClick={() => processFinishWorkout(false)}
+                  disabled={finishingWorkout}
+                  className="w-full py-3.5 rounded-xl font-semibold bg-primary/10 text-primary hover:bg-primary/20 transition-colors disabled:opacity-50"
+                >
+                  Finalizar sem Atualizar
+                  <span className="block text-[10px] font-normal text-muted-foreground mt-0.5">Apenas salva o treino (útil para dias de Deload)</span>
+                </button>
+                <button 
+                  onClick={() => setShowExitModal(false)}
+                  className="w-full py-3.5 rounded-xl font-medium text-muted-foreground hover:text-foreground transition-colors mt-2"
+                >
+                  Continuar Treinando
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 }

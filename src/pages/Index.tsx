@@ -7,6 +7,8 @@ import StatsCard from "@/components/StatsCard";
 import { supabase } from "@/lib/supabase";
 import { cache } from "@/lib/cache";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import { PullToRefreshIndicator } from "@/components/PullToRefreshIndicator";
 
 export default function Index() {
   const navigate = useNavigate();
@@ -20,6 +22,13 @@ export default function Index() {
   const [workoutsThisWeek, setWorkoutsThisWeek] = useState(0);
   const [todayWorkout, setTodayWorkout] = useState<any>(null);
   const [allMeasurements, setAllMeasurements] = useState<any[]>([]);
+
+  // Pull to Refresh
+  const { pullProgress, refreshing } = usePullToRefresh({
+    onRefresh: async () => {
+      await fetchDashboardData();
+    }
+  });
 
   useEffect(() => {
     // Camada de Cache Otimista: Tentar carregar dados instantaneamente
@@ -180,7 +189,8 @@ export default function Index() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div key="dashboard-page" className="min-h-screen bg-background pb-24">
+      <PullToRefreshIndicator pullProgress={pullProgress} refreshing={refreshing} />
       {/* Welcome Section (Non-sticky) */}
       <div className="px-5 pt-12 pb-8 flex items-center justify-between">
         <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
@@ -262,7 +272,7 @@ export default function Index() {
               <TrendingUp size={14} className="text-blood-red opacity-100" />
             </div>
             <div className="h-[180px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" debounce={100}>
                 <LineChart data={chartData} margin={{ top: 5, right: -15, left: -25, bottom: 0 }}>
                   <XAxis dataKey="date" tick={{ fontSize: 9, fill: "hsl(220 5% 60%)", fontWeight: 'bold' }} axisLine={false} tickLine={false} />
                   <YAxis yAxisId="left" tickFormatter={(value) => `${value} kg`} tick={{ fontSize: 9, fill: "hsl(220 5% 60%)", fontWeight: 'bold' }} axisLine={false} tickLine={false} />
@@ -404,8 +414,12 @@ export default function Index() {
                </div>
             </div>
             <div className="flex -space-x-3">
-               {[1,2,3].map(i => (
-                 <div key={i} className="w-8 h-8 rounded-full border-2 border-card bg-muted" />
+               {[
+                 "https://images.unsplash.com/photo-1541534741688-6078c6bfb5c5?w=100&h=100&fit=crop",
+                 "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=100&h=100&fit=crop",
+                 "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=100&h=100&fit=crop"
+               ].map((src, i) => (
+                 <img key={i} src={src} alt="Membro treinando" className="w-8 h-8 rounded-full border-2 border-card object-cover bg-muted" />
                ))}
             </div>
           </button>

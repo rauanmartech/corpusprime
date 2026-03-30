@@ -336,7 +336,7 @@ export default function Profile() {
         </h2>
         {allMeasurements.length > 0 ? (
           <div className="bg-card rounded-xl p-4 shadow-card border border-border/40">
-            <ResponsiveContainer width="100%" height={220}>
+            <ResponsiveContainer width="100%" height={220} debounce={100}>
               <LineChart data={chartData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
                 <XAxis dataKey="date" tick={{ fontSize: 10, fill: "hsl(220 5% 50%)" }} axisLine={false} tickLine={false} />
                 <YAxis yAxisId="left" tickFormatter={(v) => `${v}kg`} tick={{ fontSize: 10, fill: "hsl(220 5% 50%)" }} axisLine={false} tickLine={false} />
@@ -392,8 +392,12 @@ export default function Profile() {
       <AnimatePresence>
         {/* Modal Editar Perfil */}
         {showEditProfile && (
-          <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
-            <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }} className="bg-card border border-border/40 w-full max-w-sm rounded-[2rem] p-6 shadow-xl relative text-center">
+          <motion.div 
+            key="modal-profile"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4"
+          >
+            <motion.div initial={{ y: 50, scale: 0.95 }} animate={{ y: 0, scale: 1 }} exit={{ y: 50, scale: 0.95 }} className="bg-card border border-border/40 w-full max-w-sm rounded-[2rem] p-6 shadow-xl relative text-center">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="font-semibold text-lg text-foreground">Editar Dados</h3>
                 <button onClick={() => setShowEditProfile(false)} className="w-8 h-8 rounded-full bg-muted flex items-center justify-center"><X size={16} /></button>
@@ -432,13 +436,17 @@ export default function Profile() {
                 <Save size={18} /> Salvar Alterações
               </button>
             </motion.div>
-          </div>
+          </motion.div>
         )}
 
         {/* Modal Editar Medidas */}
         {showEditMeasurements && (
-          <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
-            <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }} className="bg-card border border-border/40 w-full max-w-sm rounded-[2rem] p-6 shadow-xl relative">
+          <motion.div 
+            key="modal-measures"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4"
+          >
+            <motion.div initial={{ y: 50, scale: 0.95 }} animate={{ y: 0, scale: 1 }} exit={{ y: 50, scale: 0.95 }} className="bg-card border border-border/40 w-full max-w-sm rounded-[2rem] p-6 shadow-xl relative">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="font-semibold text-lg text-foreground">Atualizar Medidas</h3>
                 <button onClick={() => setShowEditMeasurements(false)} className="w-8 h-8 rounded-full bg-muted flex items-center justify-center"><X size={16} /></button>
@@ -463,7 +471,7 @@ export default function Profile() {
                 <Save size={18} /> Salvar Evolução
               </button>
             </motion.div>
-          </div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

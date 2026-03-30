@@ -7,6 +7,8 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/lib/supabase";
 import type { Badge } from "@/data/mockData";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import { PullToRefreshIndicator } from "@/components/PullToRefreshIndicator";
 
 export default function Badges() {
   const navigate = useNavigate();
@@ -22,6 +24,13 @@ export default function Badges() {
   const [hasMoreLeaders, setHasMoreLeaders] = useState(true);
   const [fetchingMoreLeaders, setFetchingMoreLeaders] = useState(false);
   const LEADER_PAGE_SIZE = 5;
+
+  // Pull to Refresh
+  const { pullProgress, refreshing: ptRefreshing } = usePullToRefresh({
+    onRefresh: async () => {
+      if (user) await fetchInitialData(user.id);
+    }
+  });
 
   useEffect(() => {
     if (user) {
@@ -116,6 +125,7 @@ export default function Badges() {
 
   return (
     <div className="min-h-screen bg-background pb-24">
+      <PullToRefreshIndicator pullProgress={pullProgress} refreshing={ptRefreshing} />
       {/* Premium Header */}
       <div className="relative px-5 pt-12 pb-8 overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-primary/10 to-transparent -z-10" />
