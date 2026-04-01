@@ -46,12 +46,14 @@ export default function Profile() {
   const [loadingBadges, setLoadingBadges] = useState(true);
 
   useEffect(() => {
-    // 1. Optimistic UI: Carregar dados do cache
-    const cachedMeasurements = cache.get<any[]>("profile_measurements");
-    if (cachedMeasurements && cachedMeasurements.length > 0) {
-      setAllMeasurements(cachedMeasurements);
-      setMeasurements(cachedMeasurements[cachedMeasurements.length - 1]);
-      setPreviousMeasurement(cachedMeasurements.length > 1 ? cachedMeasurements[cachedMeasurements.length - 2] : null);
+    if (user?.id) {
+      // 1. Optimistic UI: Carregar dados do cache (chave por usuário para isolamento)
+      const cachedMeasurements = cache.get<any[]>(`profile_measurements_${user.id}`);
+      if (cachedMeasurements && cachedMeasurements.length > 0) {
+        setAllMeasurements(cachedMeasurements);
+        setMeasurements(cachedMeasurements[cachedMeasurements.length - 1]);
+        setPreviousMeasurement(cachedMeasurements.length > 1 ? cachedMeasurements[cachedMeasurements.length - 2] : null);
+      }
     }
 
     if (user) {
@@ -76,7 +78,12 @@ export default function Profile() {
       setAllMeasurements(data);
       setMeasurements(data[data.length - 1]);
       setPreviousMeasurement(data.length > 1 ? data[data.length - 2] : null);
-      cache.set("profile_measurements", data);
+      cache.set(`profile_measurements_${user.id}`, data);
+    } else {
+      // Limpa dados se o novo usuário não tiver medidas (evita vazamento de cache)
+      setAllMeasurements([]);
+      setMeasurements(null);
+      setPreviousMeasurement(null);
     }
     setLoading(false);
   };

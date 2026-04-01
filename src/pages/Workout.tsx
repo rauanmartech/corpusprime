@@ -208,8 +208,8 @@ export default function Workout() {
 
   // 4. Hydration: Restaurar estado do rascunho de hoje via localStorage
   useEffect(() => {
-    if (todayWorkout && todayExercises.length > 0 && !hasHydrated) {
-      const saved = localStorage.getItem('evolve_workout_state');
+    if (todayWorkout && todayExercises.length > 0 && !hasHydrated && user?.id) {
+      const saved = localStorage.getItem(`evolve_workout_state_${user.id}`);
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
@@ -219,17 +219,17 @@ export default function Workout() {
             if (parsed.sessionLogs) setSessionLogs(parsed.sessionLogs);
             else setCompletedExercises(parsed.completed || []);
           } else {
-            localStorage.removeItem('evolve_workout_state');
+            localStorage.removeItem(`evolve_workout_state_${user.id}`);
           }
         } catch(e) {}
       }
       setHasHydrated(true);
     }
-  }, [todayWorkout, todayExercises, hasHydrated]);
+  }, [todayWorkout, todayExercises, hasHydrated, user?.id]);
 
   // Persistência Atômica do Andamento (Salvar Offline e Sync Background)
   useEffect(() => {
-    if (todayWorkout) {
+    if (todayWorkout && user?.id) {
       const todayStr = new Date().toISOString().split('T')[0];
       const draftPayload = {
         date: todayStr,
@@ -239,7 +239,7 @@ export default function Workout() {
       };
 
       if (workoutStarted || Object.keys(sessionLogs).length > 0) {
-        localStorage.setItem('evolve_workout_state', JSON.stringify(draftPayload));
+        localStorage.setItem(`evolve_workout_state_${user.id}`, JSON.stringify(draftPayload));
         
         if (session?.user) {
           supabase.from('workout_drafts').upsert({
@@ -253,7 +253,7 @@ export default function Workout() {
         }
       }
     }
-  }, [workoutStarted, sessionLogs, todayWorkout, session]);
+  }, [workoutStarted, sessionLogs, todayWorkout, session, user?.id]);
 
   const handleCancelWorkout = () => {
     setShowExitModal(true);
@@ -551,9 +551,9 @@ export default function Workout() {
       setCompletedExercises([]);
       setSessionLogs({});
       setExpandedExerciseId(null);
-      localStorage.removeItem('evolve_workout_state');
-      if (todayWorkout) {
-        supabase.from('workout_drafts').delete().eq('user_id', session.user.id).eq('workout_id', todayWorkout.id).then();
+      if (user?.id) localStorage.removeItem(`evolve_workout_state_${user.id}`);
+      if (todayWorkout && user?.id) {
+        supabase.from('workout_drafts').delete().eq('user_id', user.id).eq('workout_id', todayWorkout.id).then();
       }
     } catch (err) {
       console.error(err);

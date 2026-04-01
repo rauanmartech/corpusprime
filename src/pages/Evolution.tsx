@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { TrendingUp, Loader2, Dumbbell } from "lucide-react";
@@ -85,7 +85,11 @@ export default function Evolution() {
           }
           const dateObj = new Date(row.training_day);
           const formattedDate = dateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
-          grouped[row.exercise_id].data.push({ date: formattedDate, weight: Number(row.max_weight) });
+          grouped[row.exercise_id].data.push({ 
+            date: formattedDate, 
+            weight: Number(row.max_weight),
+            reps: Number(row.top_set_reps || 0)
+          });
         });
       }
       setChartData(grouped);
@@ -107,9 +111,18 @@ export default function Evolution() {
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-background border border-border p-3 rounded-xl shadow-xl">
-          <p className="font-bold text-muted-foreground text-xs mb-1">{label}</p>
-          <p className="font-black text-primary text-lg">{payload[0].value} kg</p>
+        <div className="bg-background/95 backdrop-blur-md border border-border p-3 rounded-2xl shadow-xl">
+          <p className="font-bold text-muted-foreground text-[10px] mb-2 uppercase tracking-widest">{label}</p>
+          <div className="space-y-1.5">
+            {payload.map((entry: any, index: number) => (
+              <div key={index} className="flex items-center justify-between gap-4">
+                <span className="text-[10px] font-black uppercase text-muted-foreground">{entry.name}:</span>
+                <span className="text-sm font-black" style={{ color: entry.stroke }}>
+                  {entry.value} {entry.name === "CARGA" ? "kg" : "reps"}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       );
     }
@@ -165,30 +178,76 @@ export default function Evolution() {
                        <Dumbbell size={16} className="text-primary" /> {exercise.name}
                     </h3>
                     
-                    <div className="h-44 w-full">
+                    <div className="h-56 w-full mt-4">
                       <ResponsiveContainer width="100%" height="100%" debounce={100}>
                         <LineChart data={exercise.data} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
                           <XAxis 
                             dataKey="date" 
                             axisLine={false} 
                             tickLine={false} 
-                            tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10, fontWeight: 600 }} 
+                            tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 9, fontWeight: 700 }} 
                             dy={10}
                           />
                           <YAxis 
+                            yAxisId="left"
                             axisLine={false} 
                             tickLine={false} 
-                            tick={{ fill: 'white', fontSize: 11, fontWeight: 700 }} 
+                            tick={{ fill: 'hsl(0 65% 50%)', fontSize: 10, fontWeight: 800 }} 
+                            tickFormatter={(v) => `${v}k`}
+                          />
+                          <YAxis 
+                            yAxisId="right"
+                            orientation="right"
+                            axisLine={false} 
+                            tickLine={false} 
+                            tick={{ fill: '#3B82F6', fontSize: 10, fontWeight: 800 }} 
+                            tickFormatter={(v) => `${v}r`}
                           />
                           <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'hsl(var(--border))', strokeWidth: 1, strokeDasharray: '5 5' }} />
+                          <Legend 
+                            verticalAlign="top" 
+                            align="right" 
+                            height={40} 
+                            iconType="circle" 
+                            iconSize={6}
+                            wrapperStyle={{ fontSize: '9px', fontWeight: '900', paddingBottom: '10px' }} 
+                          />
                           <Line 
+                            yAxisId="left"
                             type="monotone" 
                             dataKey="weight" 
-                            stroke="hsl(var(--primary))" 
-                            strokeWidth={3} 
-                            dot={{ fill: 'hsl(var(--primary))', strokeWidth: 2, r: 4, stroke: 'hsl(var(--background))' }} 
-                            activeDot={{ r: 6, fill: 'hsl(var(--primary))', stroke: 'hsl(var(--background))', strokeWidth: 2 }}
+                            stroke="hsl(0 65% 50%)" 
+                            strokeWidth={4} 
+                            dot={{ fill: 'hsl(0 65% 50%)', r: 4, strokeWidth: 0 }} 
+                            activeDot={{ r: 6, fill: 'hsl(0 65% 50%)', stroke: 'hsl(var(--background))', strokeWidth: 2 }}
+                            name="CARGA"
                             animationDuration={1500}
+                          />
+                          {/* Camada 1: Linha Tracejada (sem pontos para evitar distorção) */}
+                          <Line 
+                            yAxisId="right"
+                            type="monotone" 
+                            dataKey="reps" 
+                            stroke="#3B82F6" 
+                            strokeWidth={2} 
+                            strokeDasharray="5 5"
+                            dot={false}
+                            activeDot={false}
+                            name="REPS"
+                            animationDuration={2000}
+                          />
+                          {/* Camada 2: Apenas os Pontos (sem linha para garantir formato circular perfeito) */}
+                          <Line 
+                            yAxisId="right"
+                            type="monotone" 
+                            dataKey="reps" 
+                            stroke="transparent" 
+                            strokeWidth={0}
+                            dot={{ fill: '#3B82F6', r: 4, strokeWidth: 0 }} 
+                            activeDot={{ r: 6, fill: '#3B82F6', stroke: 'hsl(var(--background))', strokeWidth: 2 }}
+                            name="REPS_POINTS"
+                            legendType="none"
+                            animationDuration={2000}
                           />
                         </LineChart>
                       </ResponsiveContainer>

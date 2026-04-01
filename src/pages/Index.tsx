@@ -240,7 +240,7 @@ export default function Index() {
         </div>
         
         <div className="grid grid-cols-3 gap-2">
-           <div className="bg-card border border-border/40 rounded-3xl p-3 shadow-sm text-center flex flex-col items-center">
+           <div className="bg-card border border-border/40 rounded-3xl p-3 shadow-sm text-center flex flex-col items-center opacity-80">
              <div className="w-8 h-8 rounded-xl bg-blue-500/10 flex items-center justify-center mb-2">
                <Weight size={18} className="text-blue-500" />
              </div>
@@ -248,7 +248,7 @@ export default function Index() {
              <p className="text-base font-display font-black text-foreground leading-none">{measurements?.weight || "--"}<span className="text-[10px] ml-0.5 font-normal">kg</span></p>
            </div>
 
-           <div className="bg-card border border-border/40 rounded-3xl p-3 shadow-sm text-center flex flex-col items-center">
+           <div className="bg-card border border-border/40 rounded-3xl p-3 shadow-sm text-center flex flex-col items-center opacity-80">
              <div className="w-8 h-8 rounded-xl bg-red-500/10 flex items-center justify-center mb-2">
                <Scissors size={18} className="text-red-500" />
              </div>
@@ -256,7 +256,7 @@ export default function Index() {
              <p className="text-base font-display font-black text-foreground leading-none">{measurements?.body_fat || "--"}<span className="text-[10px] ml-0.5 font-normal">%</span></p>
            </div>
 
-           <div className="bg-card border border-border/40 rounded-3xl p-3 shadow-sm text-center flex flex-col items-center">
+           <div className="bg-card border border-border/40 rounded-3xl p-3 shadow-sm text-center flex flex-col items-center opacity-80">
              <div className="w-8 h-8 rounded-xl bg-emerald-500/10 flex items-center justify-center mb-2">
                <Activity size={18} className="text-emerald-500" />
              </div>
@@ -314,7 +314,7 @@ export default function Index() {
               src="/assets/corpus_isologo.png"
               alt=""
               aria-hidden="true"
-              className="absolute left-0 top-0 h-full w-auto object-contain opacity-[0.07] pointer-events-none select-none"
+              className="absolute left-0 top-0 h-full w-auto object-contain opacity-100 pointer-events-none select-none"
             />
             {/* Animated Background Element */}
             <div className="absolute top-0 right-0 w-32 h-32 bg-blood-red/10 rounded-full -mr-16 -mt-16 blur-2xl group-hover:bg-blood-red/20 transition-all duration-700" />
@@ -346,7 +346,7 @@ export default function Index() {
                src="/assets/corpus_isologo.png"
                alt=""
                aria-hidden="true"
-               className="absolute left-0 top-0 h-full w-auto object-contain opacity-[0.07] pointer-events-none select-none"
+               className="absolute left-0 top-0 h-full w-auto object-contain opacity-100 pointer-events-none select-none"
              />
              <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16 blur-2xl opacity-50" />
              <div className="relative z-10 pr-4">
