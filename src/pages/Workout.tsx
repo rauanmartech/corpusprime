@@ -792,7 +792,7 @@ export default function Workout() {
                       </div>
 
                       {/* Espaçador Dinâmico para o FAB não cobrir as últimas listas */}
-                      <div className="h-28"></div>
+                      <div className="h-44"></div>
 
                       <AnimatePresence>
                         <motion.div 

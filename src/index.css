@@ -103,6 +103,6 @@
   }
 
   .safe-bottom {
-    padding-bottom: env(safe-area-inset-bottom, 1rem);
+    padding-bottom: env(safe-area-inset-bottom);
   }
 }
