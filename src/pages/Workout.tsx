@@ -642,174 +642,135 @@ export default function Workout() {
     setShowExitModal(false);
     try {
       const todayStr = new Date().toISOString().split('T')[0];
+      const completedExsCount = todayExercises.filter(ex => sessionLogs[ex.id]?.length > 0 && sessionLogs[ex.id].every(s => s.completed)).length;
+      const isWorkoutFinishedReady = completedExsCount === todayExercises.length && todayExercises.length > 0;
       
-      // 0. Sincronização de Carga Adaptativa Granular (Post-Workout Sync de Todas as Séries)
-      if (updateTemplates && Object.keys(sessionLogs).length > 0) {
-        const updatePromises = todayExercises.map(ex => {
-          const logs = sessionLogs[ex.id];
-          if (!logs) return null;
+      // --- LÓGICA DE REGISTRO CONDICIONAL ---
+      // Apenas registra no histórico/streak se:
+      // 1. O treino foi concluído por completo (isWorkoutFinishedReady) 
+      // 2. OU o usuário escolheu explicitamente "Atualizar e Sair" (updateTemplates)
+      const shouldRegisterHistory = updateTemplates || isWorkoutFinishedReady;
+
+      if (shouldRegisterHistory) {
+        // 1. Atualizar Templates (Fichas Master) se solicitado
+        if (updateTemplates) {
+          const updatePromises = todayExercises.map(ex => {
+            const logs = sessionLogs[ex.id];
+            if (!logs) return null;
+            const newSetsConfig = logs.map(s => ({
+              weight: s.weight,
+              reps: s.reps,
+              set_type: (s as any).set_type || 'normal',
+              target_duration: (s as any).target_duration
+            }));
+            return supabase.from('exercises').update({ 
+              sets_config: newSetsConfig,
+              sets: newSetsConfig.length,
+              weight: Math.max(...newSetsConfig.map(s => s.weight || 0), 0),
+              reps: newSetsConfig[0]?.reps || 0
+            }).eq('id', ex.id);
+          }).filter(Boolean);
           
-          // Mapeia todas as séries para o novo formato sets_config
-          const newSetsConfig = logs.map(s => ({
-            weight: s.weight,
-            reps: s.reps,
-            set_type: (s as any).set_type || 'normal',
-            target_duration: (s as any).target_duration
-          }));
-
-          // Atualiza a ficha master com a nova configuração de séries real
-          return supabase.from('exercises').update({ 
-            sets_config: newSetsConfig,
-            sets: newSetsConfig.length,
-            // Fallback para campos antigos para manter compatibilidade com gráficos legados
-            weight: Math.max(...newSetsConfig.map(s => s.weight || 0)),
-            reps: newSetsConfig[0]?.reps || 0
-          }).eq('id', ex.id);
-        }).filter(Boolean);
-        
-        // Dispara as atualizações da ficha mestre
-        await Promise.all(updatePromises);
-
-        // Atualização Otimista dos estados locais para refletir as novas cargas/tipos imediatamente
-        const updateState = (prev: DBExercise[]) => prev.map(ex => {
-          const logs = sessionLogs[ex.id];
-          if (!logs) return ex;
-          return {
-            ...ex,
-            sets_config: logs.map(s => ({ 
-              weight: s.weight, 
-              reps: s.reps, 
-              set_type: (s as any).set_type || 'normal', 
-              target_duration: (s as any).target_duration 
-            })),
-            sets: logs.length,
-            weight: Math.max(...logs.map(s => s.weight || 0)),
-            reps: logs[0]?.reps || 0
-          };
-        });
-
-        setTodayExercises(prev => updateState(prev));
-        if (activeWorkout?.id === todayWorkout.id) {
-          setExercises(prev => updateState(prev));
+          await Promise.all(updatePromises);
+          
+          // Atualização Otimista local
+          const updateState = (prev: DBExercise[]) => prev.map(ex => {
+            const logs = sessionLogs[ex.id];
+            if (!logs) return ex;
+            return {
+              ...ex,
+              sets_config: logs.map(s => ({ 
+                weight: s.weight, 
+                reps: s.reps, 
+                set_type: (s as any).set_type || 'normal', 
+                target_duration: (s as any).target_duration 
+              })),
+              sets: logs.length,
+              weight: Math.max(...logs.map(s => s.weight || 0), 0),
+              reps: logs[0]?.reps || 0
+            };
+          });
+          setTodayExercises(prev => updateState(prev));
+          if (activeWorkout?.id === todayWorkout.id) setExercises(prev => updateState(prev));
         }
-      }
 
-      // 1. Insert to history (Garante que o log da sessão fica salvo)
-      const { data: historyData, error: historyError } = await supabase.from('workout_history').insert([{
-        user_id: session.user.id,
-        workout_id: todayWorkout.id
-      }]).select('id').single();
+        // 2. Inserir no Histórico
+        const { data: historyData, error: historyError } = await supabase.from('workout_history').insert([{
+          user_id: session.user.id,
+          workout_id: todayWorkout.id
+        }]).select('id').single();
 
-      if (historyError) throw historyError;
+        if (historyError) throw historyError;
 
-      // 1.5. Inserir Logs individuais das séries em alta escala (Epley Formula)
-      if (historyData?.id && Object.keys(sessionLogs).length > 0) {
-        const logsToInsert = [];
-        for (const [exerciseId, sets] of Object.entries(sessionLogs)) {
-           for (const set of sets) {
+        // 3. Inserir Logs individuais
+        if (historyData?.id && Object.keys(sessionLogs).length > 0) {
+          const logsToInsert = [];
+          for (const [exerciseId, sets] of Object.entries(sessionLogs)) {
+            for (const set of sets) {
               if (set.completed) {
                 logsToInsert.push({
-                   history_id: historyData.id,
-                   exercise_id: exerciseId,
-                   weight: set.weight,
-                   reps: set.reps,
-                   set_type: (set as any).set_type,
-                   realized_duration: (set as any).realized_duration
+                  history_id: historyData.id,
+                  exercise_id: exerciseId,
+                  weight: set.weight,
+                  reps: set.reps,
+                  set_type: (set as any).set_type,
+                  realized_duration: (set as any).realized_duration
                 });
               }
-           }
-        }
-        if (logsToInsert.length > 0) {
-           await supabase.from('workout_logs').insert(logsToInsert).then(({ error }) => {
-              if (error && error.code !== '42P01') console.warn("Workout Logs Insert Error:", error.message);
-           });
-        }
-      }
-
-      // 2. Chamar o RPC de processamento atômico Diário/Streak (Zero Race Condition)
-      const { data: rpcResult, error: rpcError } = await supabase.rpc('process_workout_completion', {
-        p_user_id: session.user.id,
-        p_client_date: todayStr
-      });
-
-      if (rpcError) throw rpcError;
-
-      // Type Assert para objeto JSONB real do RPC
-      const result = rpcResult as unknown as { 
-        new_streak: number; 
-        new_xp: number; 
-        new_level: number; 
-        total_sessions: number; 
-        is_first_of_day: boolean 
-      };
-
-      // 3. Update Visual e Conquistas, apenas se for primeiro do dia (Ganhou XP/Sequência)
-      if (result && result.is_first_of_day) {
-        
-        // --- Registrar Timeline na Comunidade ---
-        // 1. Evento de Treino
-        await supabase.from('community_events').insert([{
-          user_id: session.user.id,
-          event_type: 'workout',
-          title: `Finalizou o treino: ${todayWorkout.name}`,
-          description: `Completou sua ${result.total_sessions}ª sessão de treino! 🔥`,
-          metadata: {
-            workout_name: todayWorkout.name,
-            total_sessions: result.total_sessions
+            }
           }
-        }]);
+          if (logsToInsert.length > 0) {
+            await supabase.from('workout_logs').insert(logsToInsert);
+          }
+        }
 
-        // 2. Marcas de Streak
-        const milestones = [7, 14, 21, 30, 60, 90, 180, 365];
-        if (milestones.includes(result.new_streak)) {
-          let label = `${result.new_streak} dias`;
-          if (result.new_streak === 30) label = "1 mês";
-          if (result.new_streak === 60) label = "2 meses";
-          if (result.new_streak === 365) label = "1 ano";
+        // 4. Processar Streak e XP via RPC
+        const { data: rpcResult, error: rpcError } = await supabase.rpc('process_workout_completion', {
+          p_user_id: session.user.id,
+          p_client_date: todayStr
+        });
 
+        if (rpcError) throw rpcError;
+
+        const result = rpcResult as any;
+
+        // 5. Feedback Visual e Conquistas
+        if (result && result.is_first_of_day) {
           await supabase.from('community_events').insert([{
             user_id: session.user.id,
-            event_type: 'milestone',
-            title: `MARCO ALCANÇADO: ${label}!`,
-            description: `Manteve a chama acesa por ${label} consecutivos! 🚀`,
-            metadata: { streak: result.new_streak }
+            event_type: 'workout',
+            title: `Finalizou o treino: ${todayWorkout.name}`,
+            description: `Completou sua ${result.total_sessions}ª sessão de treino! 🔥`,
+            metadata: { workout_name: todayWorkout.name, total_sessions: result.total_sessions }
           }]);
-        }
+          
+          await checkAndAwardAchievements(session.user.id);
 
-        // 3. Toast Level Up (Se subiu de nível calculando o delta)
-        const currentLevel = Math.floor((result.new_xp - 150) / 1500) + 1;
-        if (result.new_level > currentLevel) {
-          toast.success(`EVOLUÇÃO! Você subiu para o NÍVEL ${result.new_level}! 🔥🧗‍♂️`, {
-            duration: 8000,
-            style: { background: 'var(--blood-red)', color: 'white', fontWeight: 'bold' }
-          });
+          // Atualizar Cache
+          const cachedDashboard = cache.get<any>(`dashboard_data_${session.user.id}`);
+          if (cachedDashboard) {
+            cachedDashboard.stats = {
+              ...cachedDashboard.stats,
+              streak: result.new_streak,
+              xp: result.new_xp,
+              level: result.new_level,
+              total_sessions: result.total_sessions
+            };
+            cachedDashboard.workoutsThisWeek = (cachedDashboard.workoutsThisWeek || 0) + 1;
+            cache.set(`dashboard_data_${session.user.id}`, cachedDashboard);
+          }
         }
-
-        // 4. Verificar Conquistas de Consistência
-        await checkAndAwardAchievements(session.user.id);
+        toast.success(isWorkoutFinishedReady ? "Treino Finalizado com Sucesso! 💪🔥" : "Progresso Salvo com Sucesso!");
+      } else {
+        toast.info("Sessão encerrada sem salvar no histórico.");
       }
 
-      // 5. Finalizar Limpeza Local e Cloud Draft
-      toast.success("Treino Finalizado com Sucesso! 💪🔥");
-      
-      // Update Dashboard Cache Optimistically
-      const cachedDashboard = cache.get<any>(`dashboard_data_${session.user.id}`);
-      if (cachedDashboard && result && result.is_first_of_day) {
-        cachedDashboard.stats = {
-          ...cachedDashboard.stats,
-          streak: result.new_streak,
-          xp: result.new_xp,
-          level: result.new_level,
-          total_sessions: result.total_sessions
-        };
-        cachedDashboard.workoutsThisWeek = (cachedDashboard.workoutsThisWeek || 0) + 1;
-        cache.set(`dashboard_data_${session.user.id}`, cachedDashboard);
-      }
-
+      // --- LIMPEZA FINAL (Sempre ocorre) ---
       setWorkoutStarted(false);
       setCompletedExercises([]);
       setSessionLogs({});
       setExpandedExerciseId(null);
+      setShowExitModal(false);
       if (user?.id) localStorage.removeItem(`evolve_workout_state_${user.id}`);
       if (todayWorkout && user?.id) {
         supabase.from('workout_drafts').delete().eq('user_id', user.id).eq('workout_id', todayWorkout.id).then();
