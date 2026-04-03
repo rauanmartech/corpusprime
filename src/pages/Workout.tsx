@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Play, Info, Flame, Trophy, TrendingUp, Loader2, Dumbbell, History, BookOpen, Clock, Activity, Zap, CheckCircle2, Plus, ChevronRight, Trash2, LogIn, Edit2, CalendarDays, Circle, LayoutGrid } from "lucide-react";
+import { ArrowLeft, Play, Info, Flame, Trophy, TrendingUp, Loader2, Dumbbell, History, BookOpen, Clock, Activity, Zap, CheckCircle2, Plus, ChevronRight, Trash2, LogIn, Edit2, CalendarDays, Circle, LayoutGrid, X, ArrowDown } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
@@ -17,6 +17,8 @@ type DBWeeklySchedule = { id: string; day_of_week: number; workout_id: string; }
 type DBExerciseSet = {
   weight: number | null;
   reps: number | null;
+  set_type?: 'warmup' | 'normal' | 'failure' | 'drop' | 'time';
+  target_duration?: number;
 };
 
 type DBExercise = {
@@ -28,6 +30,81 @@ type DBExercise = {
   reps: number | null;
   sets_config?: DBExerciseSet[];
 };
+
+const SET_TYPES = {
+  normal: { icon: Play, color: "text-zinc-400", bg: "bg-zinc-500/5", border: "border-zinc-500/10", label: "Normal" },
+  warmup: { icon: Flame, color: "text-orange-500", bg: "bg-orange-500/10", border: "border-orange-500/20", label: "Aquecimento" },
+  failure: { icon: Activity, color: "text-red-500", bg: "bg-red-500/10", border: "border-red-500/20", label: "Falha" },
+  drop: { icon: ArrowDown, color: "text-purple-500", bg: "bg-purple-500/10", border: "border-purple-500/20", label: "Drop" },
+  time: { icon: Clock, color: "text-cyan-500", bg: "bg-cyan-500/10", border: "border-cyan-500/20", label: "Tempo" },
+};
+
+function TimerWidget({ target, onComplete, isFinished, initialValue }: { target?: number, onComplete: (time: number) => void, isFinished: boolean, initialValue?: number }) {
+  const [seconds, setSeconds] = useState(initialValue || 0);
+  const [isActive, setIsActive] = useState(false);
+  const [hasNotified, setHasNotified] = useState(false);
+
+  useEffect(() => {
+    let interval: any = null;
+    if (isActive) {
+      interval = setInterval(() => {
+        setSeconds(s => s + 1);
+      }, 1000);
+    } else if (!isActive && seconds !== 0) {
+      clearInterval(interval);
+    }
+    return () => clearInterval(interval);
+  }, [isActive, seconds]);
+
+  useEffect(() => {
+    if (target && seconds >= target && !hasNotified) {
+      setHasNotified(true);
+      if ("vibrate" in navigator) navigator.vibrate([200, 100, 200]);
+    }
+  }, [seconds, target, hasNotified]);
+
+  const formatTime = (s: number) => {
+    const mins = Math.floor(s / 60);
+    const secs = s % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  if (isFinished) {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-primary/10 rounded-xl py-3 border border-primary/20">
+        <span className="text-sm font-black text-primary uppercase">Tempo: {formatTime(initialValue || seconds)}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 flex items-center gap-3">
+      <div className={`flex-1 h-12 flex flex-col items-center justify-center rounded-xl border transition-all ${seconds >= (target || 9999) ? "bg-primary/20 border-primary shadow-red-glow animate-pulse" : "bg-background/50 border-border/40"}`}>
+        <span className="text-[8px] font-black uppercase text-muted-foreground leading-none mb-0.5">Tempo</span>
+        <span className={`text-lg font-black leading-none ${seconds >= (target || 9999) ? "text-primary" : "text-foreground"}`}>{formatTime(seconds)}</span>
+      </div>
+      
+      {!isActive && seconds === 0 ? (
+        <button 
+          onClick={() => setIsActive(true)}
+          className="h-12 px-4 bg-primary text-white rounded-xl font-black text-xs uppercase tracking-widest flex items-center gap-2"
+        >
+          <Play size={14} fill="currentColor" /> Start
+        </button>
+      ) : (
+        <button 
+          onClick={() => {
+            setIsActive(false);
+            onComplete(seconds);
+          }}
+          className="h-12 px-4 bg-foreground text-background rounded-xl font-black text-xs uppercase tracking-widest flex items-center gap-2"
+        >
+          <CheckCircle2 size={16} /> Concluir
+        </button>
+      )}
+    </div>
+  );
+}
 
 export default function Workout() {
   const navigate = useNavigate();
@@ -198,7 +275,7 @@ export default function Workout() {
   };
 
   // Função de Atualização de Set Log
-  const updateSetLog = (exerciseId: string, setIndex: number, field: 'weight' | 'reps' | 'completed', value: number | boolean) => {
+  const updateSetLog = (exerciseId: string, setIndex: number, field: 'weight' | 'reps' | 'completed' | 'realized_duration', value: number | boolean) => {
     setSessionLogs(prev => {
       const currentLogs = [...(prev[exerciseId] || [])];
       currentLogs[setIndex] = { ...currentLogs[setIndex], [field]: value };
@@ -369,29 +446,73 @@ export default function Workout() {
     e.preventDefault();
     if (!activeWorkout || !newExercise.name.trim()) return;
 
+    // 1. Criar objeto otimista temporário (id temporário)
+    const tempId = crypto.randomUUID();
+    const optimisticExercise: DBExercise = {
+      id: tempId,
+      workout_id: activeWorkout.id,
+      name: newExercise.name.trim(),
+      sets: newExercise.sets_config.length,
+      sets_config: newExercise.sets_config,
+      weight: Math.max(...newExercise.sets_config.map(s => s.weight || 0), 0),
+      reps: newExercise.sets_config[0]?.reps || 0
+    };
+
+    // 2. Atualizar UI instantaneamente
+    setExercises(prev => [...prev, optimisticExercise]);
+    
+    // Se estiver editando a ficha que é o treino de hoje, atualiza lá também
+    if (todayWorkout?.id === activeWorkout.id) {
+      setTodayExercises(prev => [...prev, optimisticExercise]);
+    }
+
+    setShowNewExercise(false);
+    setNewExercise({ name: "", sets_config: [{ weight: 0, reps: 10 }] });
+
     try {
       const { data, error } = await supabase.from('exercises').insert([{
         workout_id: activeWorkout.id,
-        name: newExercise.name.trim(),
-        sets: newExercise.sets_config.length,
-        sets_config: newExercise.sets_config,
+        name: optimisticExercise.name,
+        sets: optimisticExercise.sets,
+        sets_config: optimisticExercise.sets_config,
         order_index: exercises.length
       }]).select();
 
       if (error) throw error;
-      setExercises([...exercises, data[0]]);
-      setShowNewExercise(false);
-      setNewExercise({ name: "", sets_config: [{ weight: 0, reps: 10 }] });
+      
+      // 3. Substituir o objeto otimista pelo real (com ID do banco)
+      setExercises(prev => prev.map(ex => ex.id === tempId ? data[0] : ex));
+      if (todayWorkout?.id === activeWorkout.id) {
+        setTodayExercises(prev => prev.map(ex => ex.id === tempId ? data[0] : ex));
+      }
+      
       toast.success("Exercício adicionado!");
     } catch (err: any) {
+      // Rollback em caso de erro
+      setExercises(prev => prev.filter(ex => ex.id !== tempId));
+      if (todayWorkout?.id === activeWorkout.id) {
+        setTodayExercises(prev => prev.filter(ex => ex.id !== tempId));
+      }
       toast.error("Erro ao salvar exercício.");
     }
   };
 
   const handleDeleteExercise = async (id: string) => {
+    // Optimistic delete
+    const previousExercises = [...exercises];
+    setExercises(prev => prev.filter(e => e.id !== id));
+    setTodayExercises(prev => prev.filter(e => e.id !== id));
+
     const { error } = await supabase.from('exercises').delete().eq('id', id);
-    if (error) toast.error("Erro ao remover.");
-    else setExercises(exercises.filter(e => e.id !== id));
+    if (error) {
+      toast.error("Erro ao remover.");
+      setExercises(previousExercises);
+      // Re-fill today exercises if needed
+      if (todayWorkout) {
+         const { data: excs } = await supabase.from('exercises').select('*').eq('workout_id', todayWorkout.id).order('order_index');
+         setTodayExercises(excs || []);
+      }
+    }
   };
 
   const handleStartEdit = (exc: DBExercise) => {
@@ -422,13 +543,16 @@ export default function Workout() {
           initialLogs[ex.id] = ex.sets_config.map(s => ({
             weight: s.weight || 0,
             reps: s.reps || 0,
-            completed: false
+            completed: false,
+            set_type: s.set_type || 'normal',
+            target_duration: s.target_duration
           }));
         } else {
           initialLogs[ex.id] = Array.from({ length: ex.sets }, () => ({
             weight: ex.weight || 0,
             reps: ex.reps || 0,
-            completed: false
+            completed: false,
+            set_type: 'normal'
           }));
         }
       });
@@ -455,7 +579,9 @@ export default function Workout() {
           // Mapeia todas as séries para o novo formato sets_config
           const newSetsConfig = logs.map(s => ({
             weight: s.weight,
-            reps: s.reps
+            reps: s.reps,
+            set_type: (s as any).set_type || 'normal',
+            target_duration: (s as any).target_duration
           }));
 
           // Atualiza a ficha master com a nova configuração de séries real
@@ -470,6 +596,29 @@ export default function Workout() {
         
         // Dispara as atualizações da ficha mestre
         await Promise.all(updatePromises);
+
+        // Atualização Otimista dos estados locais para refletir as novas cargas/tipos imediatamente
+        const updateState = (prev: DBExercise[]) => prev.map(ex => {
+          const logs = sessionLogs[ex.id];
+          if (!logs) return ex;
+          return {
+            ...ex,
+            sets_config: logs.map(s => ({ 
+              weight: s.weight, 
+              reps: s.reps, 
+              set_type: (s as any).set_type || 'normal', 
+              target_duration: (s as any).target_duration 
+            })),
+            sets: logs.length,
+            weight: Math.max(...logs.map(s => s.weight || 0)),
+            reps: logs[0]?.reps || 0
+          };
+        });
+
+        setTodayExercises(prev => updateState(prev));
+        if (activeWorkout?.id === todayWorkout.id) {
+          setExercises(prev => updateState(prev));
+        }
       }
 
       // 1. Insert to history (Garante que o log da sessão fica salvo)
@@ -490,7 +639,9 @@ export default function Workout() {
                    history_id: historyData.id,
                    exercise_id: exerciseId,
                    weight: set.weight,
-                   reps: set.reps
+                   reps: set.reps,
+                   set_type: (set as any).set_type,
+                   realized_duration: (set as any).realized_duration
                 });
               }
            }
@@ -601,22 +752,43 @@ export default function Workout() {
     e.preventDefault();
     if (!editExerciseData.name.trim()) return;
 
+    // 1. Preparar Payload e Objeto Otimista
+    const updatedSetsConfig = editExerciseData.sets_config;
+    const optimisticUpdate = {
+      name: editExerciseData.name.trim(),
+      sets: updatedSetsConfig.length,
+      sets_config: updatedSetsConfig,
+      weight: Math.max(...updatedSetsConfig.map(s => s.weight || 0), 0),
+      reps: updatedSetsConfig[0]?.reps || 0
+    };
+
+    // 2. Atualização Local Otimista (nas duas listas se necessário)
+    setExercises(prev => prev.map(exc => exc.id === id ? { ...exc, ...optimisticUpdate } : exc));
+    setTodayExercises(prev => prev.map(exc => exc.id === id ? { ...exc, ...optimisticUpdate } : exc));
+    setEditingExerciseId(null);
+
     try {
       const { data, error } = await supabase.from('exercises').update({
-        name: editExerciseData.name.trim(),
-        sets: editExerciseData.sets_config.length,
-        sets_config: editExerciseData.sets_config,
-        // Fallback para campos antigos para manter compatibilidade com gráficos legados
-        weight: Math.max(...editExerciseData.sets_config.map(s => s.weight || 0)),
-        reps: editExerciseData.sets_config[0]?.reps || 0
+        name: optimisticUpdate.name,
+        sets: optimisticUpdate.sets,
+        sets_config: optimisticUpdate.sets_config,
+        weight: optimisticUpdate.weight,
+        reps: optimisticUpdate.reps
       }).eq('id', id).select();
 
       if (error) throw error;
-      setExercises(exercises.map(exc => exc.id === id ? data[0] : exc));
-      setEditingExerciseId(null);
+      
+      // Sincronizar com o dado real do banco por segurança
+      if (data && data[0]) {
+        setExercises(prev => prev.map(exc => exc.id === id ? data[0] : exc));
+        setTodayExercises(prev => prev.map(exc => exc.id === id ? data[0] : exc));
+      }
+      
       toast.success("Exercício atualizado!");
     } catch (err: any) {
       toast.error("Erro ao atualizar exercício.");
+      // Forçar re-sync em caso de falha crítica
+      if (user?.id) fetchWorkouts(user.id);
     }
   };
 
@@ -745,12 +917,24 @@ export default function Workout() {
                                   <p className="text-base font-black uppercase tracking-tight text-foreground">{exc.name}</p>
                                 </div>
                                 <div className="grid grid-cols-3 gap-2">
-                                  {setsToDisplay.map((s, idx) => (
-                                    <div key={idx} className="bg-muted/30 px-2 py-1.5 rounded-lg border border-border/10 flex items-center justify-center gap-1.5 transition-all">
-                                      <span className="text-[9px] font-black text-muted-foreground uppercase opacity-60">S{idx+1}</span>
-                                      <span className="text-[11px] font-bold text-foreground">{s.weight || 0}kg × {s.reps || 0}</span>
-                                    </div>
-                                  ))}
+                                  {setsToDisplay.map((s: any, idx) => {
+                                    const meta = SET_TYPES[s.set_type as keyof typeof SET_TYPES] || SET_TYPES.normal;
+                                    const Icon = meta.icon;
+                                    return (
+                                      <div key={idx} className={`relative flex flex-col items-center justify-center py-2 px-1 rounded-xl border ${meta.bg} ${meta.border} transition-all overflow-hidden group`}>
+                                        <div className={`absolute -top-1 -right-1 opacity-10 group-hover:opacity-20 transition-opacity ${meta.color}`}>
+                                          <Icon size={28} />
+                                        </div>
+                                        <div className="flex items-center gap-1 mb-0.5 relative z-10">
+                                          <Icon size={8} className={meta.color} />
+                                          <span className="text-[7px] font-black uppercase tracking-tighter text-muted-foreground">SET {idx+1}</span>
+                                        </div>
+                                        <span className="text-[10px] font-black text-foreground leading-none relative z-10">
+                                          {s.set_type === 'time' ? `${(s as any).target_duration || 0}s` : `${s.weight || 0}k × ${s.reps || 0}`}
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                               </div>
                             );
@@ -788,43 +972,65 @@ export default function Workout() {
                                     exit={{ height: 0, opacity: 0 }}
                                     className="mt-2 space-y-2 overflow-hidden"
                                   >
-                                    {logs.map((set, setIndex) => (
+                                    {logs.map((set, setIndex) => {
+                                      const meta = SET_TYPES[(set as any).set_type as keyof typeof SET_TYPES] || SET_TYPES.normal;
+                                      const Icon = meta.icon;
+
+                                      return (
                                       <div key={setIndex} className={`flex items-center gap-3 p-3 rounded-xl border ${set.completed ? "bg-primary/10 border-primary/20" : "bg-muted/30 border-border/10"} transition-colors`}>
-                                        <div className="w-8 text-center text-[10px] font-bold text-muted-foreground uppercase leading-tight">
-                                          Série<br/>{setIndex + 1}
+                                        <div className="w-8 flex flex-col items-center justify-center gap-1">
+                                          <div className={`w-7 h-7 rounded-lg ${meta.bg} flex items-center justify-center shrink-0`}>
+                                            <Icon size={14} className={meta.color} />
+                                          </div>
+                                          <span className="text-[8px] font-black text-muted-foreground uppercase">S{setIndex+1}</span>
                                         </div>
                                         
-                                        <div className="flex-1 flex gap-2">
-                                          <div className="flex-1 flex flex-col bg-background/50 rounded-lg p-1.5 focus-within:ring-1 ring-primary/30">
-                                            <span className="text-[9px] font-bold text-muted-foreground ml-1">KG</span>
-                                            <input 
-                                              type="number" 
-                                              value={set.weight || ''}
-                                              disabled={set.completed}
-                                              onChange={(e) => updateSetLog(exc.id, setIndex, 'weight', Number(e.target.value))}
-                                              className="bg-transparent text-sm font-semibold w-full outline-none px-1 text-center disabled:opacity-50"
-                                            />
-                                          </div>
-                                          <div className="flex-1 flex flex-col bg-background/50 rounded-lg p-1.5 focus-within:ring-1 ring-primary/30">
-                                            <span className="text-[9px] font-bold text-muted-foreground ml-1">REPS</span>
-                                            <input 
-                                              type="number" 
-                                              value={set.reps || ''}
-                                              disabled={set.completed}
-                                              onChange={(e) => updateSetLog(exc.id, setIndex, 'reps', Number(e.target.value))}
-                                              className="bg-transparent text-sm font-semibold w-full outline-none px-1 text-center disabled:opacity-50"
-                                            />
-                                          </div>
-                                        </div>
+                                        {(set as any).set_type === 'time' ? (
+                                          <TimerWidget 
+                                            target={(set as any).target_duration} 
+                                            isFinished={set.completed}
+                                            initialValue={(set as any).realized_duration}
+                                            onComplete={(time) => {
+                                              updateSetLog(exc.id, setIndex, 'realized_duration', time);
+                                              updateSetLog(exc.id, setIndex, 'completed', true);
+                                            }} 
+                                          />
+                                        ) : (
+                                          <>
+                                            <div className="flex-1 flex gap-2">
+                                              <div className="flex-1 flex flex-col bg-background/50 rounded-lg p-1.5 focus-within:ring-1 ring-primary/30">
+                                                <span className="text-[9px] font-bold text-muted-foreground ml-1">KG</span>
+                                                <input 
+                                                  type="number" 
+                                                  value={set.weight || ''}
+                                                  disabled={set.completed}
+                                                  onChange={(e) => updateSetLog(exc.id, setIndex, 'weight', Number(e.target.value))}
+                                                  className="bg-transparent text-sm font-semibold w-full outline-none px-1 text-center disabled:opacity-50"
+                                                />
+                                              </div>
+                                              <div className="flex-1 flex flex-col bg-background/50 rounded-lg p-1.5 focus-within:ring-1 ring-primary/30">
+                                                <span className="text-[9px] font-bold text-muted-foreground ml-1">REPS</span>
+                                                <input 
+                                                  type="number" 
+                                                  value={set.reps || ''}
+                                                  disabled={set.completed}
+                                                  onChange={(e) => updateSetLog(exc.id, setIndex, 'reps', Number(e.target.value))}
+                                                  className="bg-transparent text-sm font-semibold w-full outline-none px-1 text-center disabled:opacity-50"
+                                                />
+                                              </div>
+                                            </div>
 
-                                        <button 
-                                          onClick={() => updateSetLog(exc.id, setIndex, 'completed', !set.completed)}
-                                          className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors shrink-0 ${set.completed ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-primary/20 hover:text-primary"}`}
-                                        >
-                                          <CheckCircle2 size={20} className={set.completed ? "fill-primary-foreground/20" : ""} />
-                                        </button>
+                                            <button 
+                                              onClick={() => updateSetLog(exc.id, setIndex, 'completed', !set.completed)}
+                                              className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors shrink-0 ${set.completed ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-primary/20 hover:text-primary"}`}
+                                            >
+                                              <CheckCircle2 size={20} className={set.completed ? "fill-primary-foreground/20" : ""} />
+                                            </button>
+                                          </>
+                                        )}
                                       </div>
-                                    ))}
+                                      );
+                                    })}
                                   </motion.div>
                                 )}
                               </AnimatePresence>
@@ -1029,32 +1235,67 @@ export default function Workout() {
                                         <span className="text-[10px] font-black text-muted-foreground">S{idx+1}</span>
                                       </div>
                                       <div className="flex-1 flex gap-2">
-                                        <div className="flex-1 flex flex-col bg-background/50 rounded-lg p-1.5 focus-within:ring-1 ring-primary/30">
-                                          <span className="text-[9px] font-bold text-muted-foreground ml-1">KG</span>
-                                          <input 
-                                            type="number" 
-                                            value={set.weight ?? ''}
+                                        <div className="flex-[0.5] flex flex-col bg-background/50 rounded-lg p-1.5 border border-border/20">
+                                          <span className="text-[8px] font-bold text-muted-foreground ml-1 uppercase">Tipo</span>
+                                          <select 
+                                            value={set.set_type || 'normal'}
                                             onChange={(e) => {
                                               const newSets = [...editExerciseData.sets_config];
-                                              newSets[idx] = { ...newSets[idx], weight: Number(e.target.value) };
+                                              newSets[idx] = { ...newSets[idx], set_type: e.target.value as any };
                                               setEditExerciseData({ ...editExerciseData, sets_config: newSets });
                                             }}
-                                            className="bg-transparent text-sm font-semibold w-full outline-none px-1 text-center"
-                                          />
+                                            className="bg-transparent text-[10px] font-bold w-full outline-none px-1 appearance-none"
+                                          >
+                                            {Object.entries(SET_TYPES).map(([key, value]) => (
+                                              <option key={key} value={key} className="bg-card">{value.label}</option>
+                                            ))}
+                                          </select>
                                         </div>
-                                        <div className="flex-1 flex flex-col bg-background/50 rounded-lg p-1.5 focus-within:ring-1 ring-primary/30">
-                                          <span className="text-[9px] font-bold text-muted-foreground ml-1">REPS</span>
-                                          <input 
-                                            type="number" 
-                                            value={set.reps ?? ''}
-                                            onChange={(e) => {
-                                              const newSets = [...editExerciseData.sets_config];
-                                              newSets[idx] = { ...newSets[idx], reps: Number(e.target.value) };
-                                              setEditExerciseData({ ...editExerciseData, sets_config: newSets });
-                                            }}
-                                            className="bg-transparent text-sm font-semibold w-full outline-none px-1 text-center"
-                                          />
-                                        </div>
+                                        {set.set_type === 'time' ? (
+                                          <div className="flex-1 flex flex-col bg-background/50 rounded-lg p-1.5 focus-within:ring-1 ring-primary/30">
+                                            <span className="text-[9px] font-bold text-muted-foreground ml-1">TEMPO (s)</span>
+                                            <input 
+                                              type="number" 
+                                              value={set.target_duration ?? ''}
+                                              onChange={(e) => {
+                                                const newSets = [...editExerciseData.sets_config];
+                                                newSets[idx] = { ...newSets[idx], target_duration: Number(e.target.value) };
+                                                setEditExerciseData({ ...editExerciseData, sets_config: newSets });
+                                              }}
+                                              className="bg-transparent text-sm font-semibold w-full outline-none px-1 text-center"
+                                              placeholder="Seg"
+                                            />
+                                          </div>
+                                        ) : (
+                                          <>
+                                            <div className="flex-1 flex flex-col bg-background/50 rounded-lg p-1.5 focus-within:ring-1 ring-primary/30">
+                                              <span className="text-[9px] font-bold text-muted-foreground ml-1">KG</span>
+                                              <input 
+                                                type="number" 
+                                                value={set.weight ?? ''}
+                                                onChange={(e) => {
+                                                  const newSets = [...editExerciseData.sets_config];
+                                                  newSets[idx] = { ...newSets[idx], weight: Number(e.target.value) };
+                                                  setEditExerciseData({ ...editExerciseData, sets_config: newSets });
+                                                }}
+                                                className="bg-transparent text-sm font-semibold w-full outline-none px-1 text-center"
+                                              />
+                                            </div>
+                                            <div className="flex-1 flex flex-col bg-background/50 rounded-lg p-1.5 focus-within:ring-1 ring-primary/30">
+                                              <span className="text-[9px] font-bold text-muted-foreground ml-1">REPS</span>
+                                              <input 
+                                                type="number" 
+                                                value={set.reps ?? ''}
+                                                onChange={(e) => {
+                                                  const newSets = [...editExerciseData.sets_config];
+                                                  newSets[idx] = { ...newSets[idx], reps: Number(e.target.value) };
+                                                  setEditExerciseData({ ...editExerciseData, sets_config: newSets });
+                                                }}
+                                                className="bg-transparent text-sm font-semibold w-full outline-none px-1 text-center"
+                                              />
+                                            </div>
+                                          </>
+                                        )}
                                       </div>
                                       <button 
                                         type="button"
@@ -1102,21 +1343,43 @@ export default function Workout() {
                           
                           <div className="space-y-2">
                              <div className="grid grid-cols-3 gap-2">
-                                {(exc.sets_config && exc.sets_config.length > 0 ? exc.sets_config : Array.from({ length: exc.sets }, () => ({ weight: exc.weight, reps: exc.reps }))).map((s, idx) => (
-                                  <div key={idx} className="bg-muted/40 px-2 py-2 rounded-xl flex flex-col items-center gap-1 border border-border/5 group hover:border-primary/20 transition-all">
-                                    <span className="text-[9px] font-black text-muted-foreground uppercase opacity-40">S{idx+1}</span>
-                                    <div className="flex flex-col items-center leading-none">
-                                       <div className="flex items-baseline gap-0.5">
-                                          <span className="text-sm font-display font-bold text-foreground">{s.weight || 0}</span>
-                                          <span className="text-[8px] font-bold text-muted-foreground">kg</span>
-                                       </div>
-                                       <div className="flex items-baseline gap-0.5">
-                                          <span className="text-sm font-display font-bold text-foreground">{s.reps || 0}</span>
-                                          <span className="text-[8px] font-bold text-muted-foreground">reps</span>
-                                       </div>
+                                {(exc.sets_config && exc.sets_config.length > 0 ? exc.sets_config : Array.from({ length: exc.sets }, () => ({ weight: exc.weight, reps: exc.reps }))).map((s, idx) => {
+                                  const meta = SET_TYPES[(s as any).set_type as keyof typeof SET_TYPES] || SET_TYPES.normal;
+                                  const Icon = meta.icon;
+                                  return (
+                                  <div key={idx} className={`relative flex flex-col items-center justify-center p-2 rounded-2xl border ${meta.bg} ${meta.border} transition-all group overflow-hidden`}>
+                                    <div className={`absolute -top-2 -right-2 opacity-10 group-hover:opacity-25 transition-opacity ${meta.color}`}>
+                                      <Icon size={40} />
+                                    </div>
+                                    
+                                    <div className="flex items-center gap-1 mb-1.5 relative z-10">
+                                      <div className={`p-1 rounded-md ${meta.bg} ${meta.color} border ${meta.border}`}>
+                                        <Icon size={10} />
+                                      </div>
+                                      <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest">S{idx+1}</span>
+                                    </div>
+
+                                    <div className="flex flex-col items-center leading-none relative z-10">
+                                       {(s as any).set_type === 'time' ? (
+                                         <div className="flex items-baseline gap-0.5">
+                                            <span className="text-sm font-display font-black text-foreground">{(s as any).target_duration || 0}</span>
+                                            <span className="text-[8px] font-bold text-muted-foreground uppercase">seg</span>
+                                         </div>
+                                       ) : (
+                                         <div className="space-y-0.5 flex flex-col items-center">
+                                           <div className="flex items-baseline gap-0.5">
+                                              <span className="text-sm font-display font-black text-foreground">{s.weight || 0}</span>
+                                              <span className="text-[8px] font-bold text-muted-foreground uppercase">kg</span>
+                                           </div>
+                                           <div className="flex items-baseline gap-0.5 opacity-60">
+                                              <span className="text-[10px] font-display font-bold text-foreground">{s.reps || 0}</span>
+                                              <span className="text-[7px] font-bold text-muted-foreground uppercase">reps</span>
+                                           </div>
+                                         </div>
+                                       )}
                                     </div>
                                   </div>
-                                ))}
+                                )})}
                              </div>
                           </div>
                         </>
@@ -1159,32 +1422,67 @@ export default function Workout() {
                                     <span className="text-[10px] font-black text-muted-foreground">S{idx+1}</span>
                                   </div>
                                   <div className="flex-1 flex gap-2">
-                                    <div className="flex-1 flex flex-col bg-background/50 rounded-lg p-1.5 focus-within:ring-1 ring-primary/30">
-                                      <span className="text-[9px] font-bold text-muted-foreground ml-1">KG</span>
-                                      <input 
-                                        type="number" 
-                                        value={set.weight ?? ''}
+                                    <div className="flex-[0.5] flex flex-col bg-background/50 rounded-lg p-1.5 border border-border/20">
+                                      <span className="text-[8px] font-bold text-muted-foreground ml-1 uppercase">Tipo</span>
+                                      <select 
+                                        value={set.set_type || 'normal'}
                                         onChange={(e) => {
                                           const newSets = [...newExercise.sets_config];
-                                          newSets[idx] = { ...newSets[idx], weight: Number(e.target.value) };
+                                          newSets[idx] = { ...newSets[idx], set_type: e.target.value as any };
                                           setNewExercise({ ...newExercise, sets_config: newSets });
                                         }}
-                                        className="bg-transparent text-sm font-semibold w-full outline-none px-1 text-center"
-                                      />
+                                        className="bg-transparent text-[10px] font-bold w-full outline-none px-1 appearance-none"
+                                      >
+                                        {Object.entries(SET_TYPES).map(([key, value]) => (
+                                          <option key={key} value={key} className="bg-card">{value.label}</option>
+                                        ))}
+                                      </select>
                                     </div>
-                                    <div className="flex-1 flex flex-col bg-background/50 rounded-lg p-1.5 focus-within:ring-1 ring-primary/30">
-                                      <span className="text-[9px] font-bold text-muted-foreground ml-1">REPS</span>
-                                      <input 
-                                        type="number" 
-                                        value={set.reps ?? ''}
-                                        onChange={(e) => {
-                                          const newSets = [...newExercise.sets_config];
-                                          newSets[idx] = { ...newSets[idx], reps: Number(e.target.value) };
-                                          setNewExercise({ ...newExercise, sets_config: newSets });
-                                        }}
-                                        className="bg-transparent text-sm font-semibold w-full outline-none px-1 text-center"
-                                      />
-                                    </div>
+                                    {set.set_type === 'time' ? (
+                                      <div className="flex-1 flex flex-col bg-background/50 rounded-lg p-1.5 focus-within:ring-1 ring-primary/30">
+                                        <span className="text-[9px] font-bold text-muted-foreground ml-1">TEMPO (s)</span>
+                                        <input 
+                                          type="number" 
+                                          value={set.target_duration ?? ''}
+                                          onChange={(e) => {
+                                            const newSets = [...newExercise.sets_config];
+                                            newSets[idx] = { ...newSets[idx], target_duration: Number(e.target.value) };
+                                            setNewExercise({ ...newExercise, sets_config: newSets });
+                                          }}
+                                          className="bg-transparent text-sm font-semibold w-full outline-none px-1 text-center"
+                                          placeholder="Seg"
+                                        />
+                                      </div>
+                                    ) : (
+                                      <>
+                                        <div className="flex-1 flex flex-col bg-background/50 rounded-lg p-1.5 focus-within:ring-1 ring-primary/30">
+                                          <span className="text-[9px] font-bold text-muted-foreground ml-1">KG</span>
+                                          <input 
+                                            type="number" 
+                                            value={set.weight ?? ''}
+                                            onChange={(e) => {
+                                              const newSets = [...newExercise.sets_config];
+                                              newSets[idx] = { ...newSets[idx], weight: Number(e.target.value) };
+                                              setNewExercise({ ...newExercise, sets_config: newSets });
+                                            }}
+                                            className="bg-transparent text-sm font-semibold w-full outline-none px-1 text-center"
+                                          />
+                                        </div>
+                                        <div className="flex-1 flex flex-col bg-background/50 rounded-lg p-1.5 focus-within:ring-1 ring-primary/30">
+                                          <span className="text-[9px] font-bold text-muted-foreground ml-1">REPS</span>
+                                          <input 
+                                            type="number" 
+                                            value={set.reps ?? ''}
+                                            onChange={(e) => {
+                                              const newSets = [...newExercise.sets_config];
+                                              newSets[idx] = { ...newSets[idx], reps: Number(e.target.value) };
+                                              setNewExercise({ ...newExercise, sets_config: newSets });
+                                            }}
+                                            className="bg-transparent text-sm font-semibold w-full outline-none px-1 text-center"
+                                          />
+                                        </div>
+                                      </>
+                                    )}
                                   </div>
                                   <button 
                                     type="button"
