@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Play, Info, Flame, Trophy, TrendingUp, Loader2, Dumbbell, History, BookOpen, Clock, Activity, Zap, CheckCircle2, Plus, ChevronRight, Trash2, LogIn, Edit2, CalendarDays, Circle, LayoutGrid, X, ArrowDown } from "lucide-react";
+import { ArrowLeft, Play, Info, Flame, Trophy, TrendingUp, Loader2, Dumbbell, History, BookOpen, Clock, Activity, Zap, CheckCircle2, Plus, ChevronRight, Trash2, LogIn, Edit2, CalendarDays, Circle, LayoutGrid, X, ArrowDown, Timer, SkipForward, Pause } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
@@ -38,6 +38,191 @@ const SET_TYPES = {
   drop: { icon: ArrowDown, color: "text-purple-500", bg: "bg-purple-500/10", border: "border-purple-500/20", label: "Drop" },
   time: { icon: Clock, color: "text-cyan-500", bg: "bg-cyan-500/10", border: "border-cyan-500/20", label: "Tempo" },
 };
+
+// Componente de Contagem Regressiva de Descanso
+function RestCountdown({ 
+  defaultSeconds = 60, 
+  onFinish 
+}: { 
+  defaultSeconds?: number; 
+  onFinish: () => void; 
+}) {
+  const [total, setTotal] = useState(defaultSeconds);
+  const [remaining, setRemaining] = useState(defaultSeconds);
+  const [isRunning, setIsRunning] = useState(true);
+  const [editing, setEditing] = useState(false);
+  const [inputVal, setInputVal] = useState(String(defaultSeconds));
+  const [finished, setFinished] = useState(false);
+
+  useEffect(() => {
+    if (!isRunning || remaining <= 0) return;
+    const interval = setInterval(() => {
+      setRemaining(r => {
+        if (r <= 1) {
+          clearInterval(interval);
+          setIsRunning(false);
+          setFinished(true);
+          if ("vibrate" in navigator) navigator.vibrate([300, 100, 300, 100, 300]);
+          return 0;
+        }
+        return r - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isRunning, remaining]);
+
+  const formatTime = (s: number) => {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${m}:${sec.toString().padStart(2, '0')}`;
+  };
+
+  const progress = total > 0 ? (remaining / total) : 0;
+  const circumference = 2 * Math.PI * 28;
+  const strokeDashoffset = circumference * (1 - progress);
+
+  const handleEditSubmit = () => {
+    const newVal = Math.max(5, Math.min(600, parseInt(inputVal) || defaultSeconds));
+    setTotal(newVal);
+    setRemaining(newVal);
+    setIsRunning(true);
+    setFinished(false);
+    setEditing(false);
+  };
+
+  const handleAddTime = (secs: number) => {
+    setRemaining(r => Math.max(1, r + secs));
+    setTotal(t => Math.max(1, t + secs));
+    setFinished(false);
+    setIsRunning(true);
+  };
+
+  return (
+    <div className={`mt-2 rounded-2xl overflow-hidden transition-all ${
+      finished 
+        ? "bg-emerald-500/10 border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.1)]" 
+        : isRunning 
+          ? "bg-gradient-to-br from-red-950/90 via-zinc-950 to-zinc-950 border border-red-900/30 shadow-[0_0_20px_rgba(153,27,27,0.15)]" 
+          : "bg-zinc-950/60 border border-zinc-800/40"
+    }`}>
+      <div className="flex items-center gap-3 p-3">
+        {/* Ring Progress */}
+        <div className="relative shrink-0">
+          <svg width="64" height="64" viewBox="0 0 64 64" className="-rotate-90">
+            <circle
+              cx="32" cy="32" r="28"
+              fill="none"
+              stroke="rgba(255,255,255,0.03)"
+              strokeWidth="4"
+            />
+            <circle
+              cx="32" cy="32" r="28"
+              fill="none"
+              stroke={finished ? "#10b981" : remaining <= 5 ? "#ef4444" : "#b91c1c"}
+              strokeWidth="4"
+              strokeLinecap="round"
+              strokeDasharray={circumference}
+              strokeDashoffset={strokeDashoffset}
+              className="transition-all duration-1000"
+            />
+          </svg>
+          <div className="absolute inset-0 flex items-center justify-center">
+            {finished ? (
+              <CheckCircle2 size={20} className="text-emerald-400" />
+            ) : (
+              <span className={`text-sm font-black tabular-nums leading-none ${
+                remaining <= 5 ? "text-red-500 animate-pulse" : "text-white"
+              }`}>
+                {formatTime(remaining)}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Info + Controls */}
+        <div className="flex-1 min-w-0">
+          {finished ? (
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-emerald-400 mb-0.5">Pronto! 🔥</p>
+              <p className="text-xs text-muted-foreground font-medium">Vá para a próxima série</p>
+            </div>
+          ) : (
+            <div>
+              <div className="flex items-center gap-1.5 mb-1">
+                <Timer size={10} className="text-red-500" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Descanso</span>
+              </div>
+              {editing ? (
+                <div className="flex items-center gap-1.5">
+                  <input
+                    autoFocus
+                    type="number"
+                    value={inputVal}
+                    onChange={e => setInputVal(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleEditSubmit()}
+                    onBlur={handleEditSubmit}
+                    className="w-16 bg-red-950/40 border border-red-900/40 rounded-lg px-2 py-1 text-sm font-bold text-white outline-none text-center"
+                    min={5} max={600}
+                  />
+                  <span className="text-xs text-muted-foreground">seg</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleAddTime(-15)}
+                    className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-zinc-800/60 text-zinc-400 hover:bg-red-900/40 hover:text-white transition-colors"
+                  >-15s</button>
+                  <button
+                    onClick={() => setEditing(true)}
+                    className="text-xs font-black text-white tabular-nums hover:text-red-500 transition-colors"
+                  >
+                    {formatTime(total)} total
+                  </button>
+                  <button
+                    onClick={() => handleAddTime(15)}
+                    className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-zinc-800/60 text-zinc-400 hover:bg-red-900/40 hover:text-white transition-colors"
+                  >+15s</button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex flex-col gap-1.5 shrink-0">
+          {finished ? (
+            <button
+              onClick={onFinish}
+              className="h-9 px-3 bg-emerald-500 text-white rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-1.5 hover:bg-emerald-400 transition-colors shadow-lg shadow-emerald-500/20"
+            >
+              <SkipForward size={12} /> OK
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={() => setIsRunning(r => !r)}
+                className={`h-9 w-9 rounded-xl flex items-center justify-center transition-colors ${
+                  isRunning 
+                    ? "bg-zinc-800/80 text-zinc-300 hover:bg-zinc-700" 
+                    : "bg-red-500/20 text-red-500 hover:bg-red-500/30"
+                }`}
+              >
+                {isRunning ? <Pause size={14} /> : <Play size={14} fill="currentColor" />}
+              </button>
+              <button
+                onClick={onFinish}
+                className="h-9 w-9 rounded-xl bg-zinc-800/50 text-zinc-500 hover:bg-red-900/20 hover:text-red-400 flex items-center justify-center transition-colors px-1"
+                title="Pular"
+              >
+                <SkipForward size={14} />
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function TimerWidget({ target, onComplete, isFinished, initialValue }: { target?: number, onComplete: (time: number) => void, isFinished: boolean, initialValue?: number }) {
   const [seconds, setSeconds] = useState(initialValue || 0);
@@ -206,6 +391,9 @@ export default function Workout() {
   const [sessionLogs, setSessionLogs] = useState<Record<string, { weight: number, reps: number, completed: boolean }[]>>({});
   const [expandedExerciseId, setExpandedExerciseId] = useState<string | null>(null);
   const [showExitModal, setShowExitModal] = useState(false);
+  // Rest timer: key = `${exerciseId}-${setIndex}`
+  const [activeRestKey, setActiveRestKey] = useState<string | null>(null);
+  const [restDuration, setRestDuration] = useState(60); // segundos padrão de descanso
 
   // Formulários Treino
   const [showNewWorkout, setShowNewWorkout] = useState(false);
@@ -356,7 +544,13 @@ export default function Workout() {
       
       if (field === 'completed' && value === true) {
         const allSetsCompleted = currentLogs.every(s => s.completed);
+        // Disparar contador de descanso se houver próxima série no mesmo exercício
+        const hasNextSet = setIndex < currentLogs.length - 1;
+        if (hasNextSet && !allSetsCompleted) {
+          setTimeout(() => setActiveRestKey(`${exerciseId}-${setIndex}`), 150);
+        }
         if (allSetsCompleted) {
+          setActiveRestKey(null);
           const currentIndex = todayExercises.findIndex(ex => ex.id === exerciseId);
           if (currentIndex !== -1 && currentIndex < todayExercises.length - 1) {
             setTimeout(() => setExpandedExerciseId(todayExercises[currentIndex + 1].id), 300);
@@ -364,6 +558,10 @@ export default function Workout() {
             setTimeout(() => setExpandedExerciseId(null), 300);
           }
         }
+      }
+      // Ao desmarcar série, remove o descanso ativo deste set
+      if (field === 'completed' && value === false) {
+        setActiveRestKey(prev2 => prev2 === `${exerciseId}-${setIndex}` ? null : prev2);
       }
       return newSessionLogs;
     });
@@ -1009,59 +1207,83 @@ export default function Workout() {
                                     {logs.map((set, setIndex) => {
                                       const meta = SET_TYPES[(set as any).set_type as keyof typeof SET_TYPES] || SET_TYPES.normal;
                                       const Icon = meta.icon;
+                                      const restKey = `${exc.id}-${setIndex}`;
+                                      const isRestActive = activeRestKey === restKey;
 
                                       return (
-                                      <div key={setIndex} className={`flex items-center gap-3 p-3 rounded-xl border ${set.completed ? "bg-primary/10 border-primary/20" : "bg-muted/30 border-border/10"} transition-colors`}>
-                                        <div className="w-8 flex flex-col items-center justify-center gap-1">
-                                          <div className={`w-7 h-7 rounded-lg ${meta.bg} flex items-center justify-center shrink-0`}>
-                                            <Icon size={14} className={meta.color} />
-                                          </div>
-                                          <span className="text-[8px] font-black text-muted-foreground uppercase">S{setIndex+1}</span>
-                                        </div>
-                                        
-                                        {(set as any).set_type === 'time' ? (
-                                          <TimerWidget 
-                                            target={(set as any).target_duration} 
-                                            isFinished={set.completed}
-                                            initialValue={(set as any).realized_duration}
-                                            onComplete={(time) => {
-                                              updateSetLog(exc.id, setIndex, 'realized_duration', time);
-                                              updateSetLog(exc.id, setIndex, 'completed', true);
-                                            }} 
-                                          />
-                                        ) : (
-                                          <>
-                                            <div className="flex-1 flex gap-2">
-                                              <div className="flex-1 flex flex-col bg-background/50 rounded-lg p-1.5 focus-within:ring-1 ring-primary/30">
-                                                <span className="text-[9px] font-bold text-muted-foreground ml-1">KG</span>
-                                                <input 
-                                                  type="number" 
-                                                  value={set.weight || ''}
-                                                  disabled={set.completed}
-                                                  onChange={(e) => updateSetLog(exc.id, setIndex, 'weight', Number(e.target.value))}
-                                                  className="bg-transparent text-sm font-semibold w-full outline-none px-1 text-center disabled:opacity-50"
-                                                />
-                                              </div>
-                                              <div className="flex-1 flex flex-col bg-background/50 rounded-lg p-1.5 focus-within:ring-1 ring-primary/30">
-                                                <span className="text-[9px] font-bold text-muted-foreground ml-1">REPS</span>
-                                                <input 
-                                                  type="number" 
-                                                  value={set.reps || ''}
-                                                  disabled={set.completed}
-                                                  onChange={(e) => updateSetLog(exc.id, setIndex, 'reps', Number(e.target.value))}
-                                                  className="bg-transparent text-sm font-semibold w-full outline-none px-1 text-center disabled:opacity-50"
-                                                />
-                                              </div>
+                                      <div key={setIndex}>
+                                        <div className={`flex items-center gap-3 p-3 rounded-xl border ${set.completed ? "bg-primary/10 border-primary/20" : "bg-muted/30 border-border/10"} transition-colors`}>
+                                          <div className="w-8 flex flex-col items-center justify-center gap-1">
+                                            <div className={`w-7 h-7 rounded-lg ${meta.bg} flex items-center justify-center shrink-0`}>
+                                              <Icon size={14} className={meta.color} />
                                             </div>
+                                            <span className="text-[8px] font-black text-muted-foreground uppercase">S{setIndex+1}</span>
+                                          </div>
+                                          
+                                          {(set as any).set_type === 'time' ? (
+                                            <TimerWidget 
+                                              target={(set as any).target_duration} 
+                                              isFinished={set.completed}
+                                              initialValue={(set as any).realized_duration}
+                                              onComplete={(time) => {
+                                                updateSetLog(exc.id, setIndex, 'realized_duration', time);
+                                                updateSetLog(exc.id, setIndex, 'completed', true);
+                                              }} 
+                                            />
+                                          ) : (
+                                            <>
+                                              <div className="flex-1 flex gap-2">
+                                                <div className="flex-1 flex flex-col bg-background/50 rounded-lg p-1.5 focus-within:ring-1 ring-primary/30">
+                                                  <span className="text-[9px] font-bold text-muted-foreground ml-1">KG</span>
+                                                  <input 
+                                                    type="number" 
+                                                    value={set.weight || ''}
+                                                    disabled={set.completed}
+                                                    onChange={(e) => updateSetLog(exc.id, setIndex, 'weight', Number(e.target.value))}
+                                                    className="bg-transparent text-sm font-semibold w-full outline-none px-1 text-center disabled:opacity-50"
+                                                  />
+                                                </div>
+                                                <div className="flex-1 flex flex-col bg-background/50 rounded-lg p-1.5 focus-within:ring-1 ring-primary/30">
+                                                  <span className="text-[9px] font-bold text-muted-foreground ml-1">REPS</span>
+                                                  <input 
+                                                    type="number" 
+                                                    value={set.reps || ''}
+                                                    disabled={set.completed}
+                                                    onChange={(e) => updateSetLog(exc.id, setIndex, 'reps', Number(e.target.value))}
+                                                    className="bg-transparent text-sm font-semibold w-full outline-none px-1 text-center disabled:opacity-50"
+                                                  />
+                                                </div>
+                                              </div>
 
-                                            <button 
-                                              onClick={() => updateSetLog(exc.id, setIndex, 'completed', !set.completed)}
-                                              className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors shrink-0 ${set.completed ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-primary/20 hover:text-primary"}`}
+                                              <button 
+                                                onClick={() => updateSetLog(exc.id, setIndex, 'completed', !set.completed)}
+                                                className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors shrink-0 ${set.completed ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-primary/20 hover:text-primary"}`}
+                                              >
+                                                <CheckCircle2 size={20} className={set.completed ? "fill-primary-foreground/20" : ""} />
+                                              </button>
+                                            </>
+                                          )}
+                                        </div>
+
+                                        {/* Contador de Descanso entre Séries */}
+                                        <AnimatePresence>
+                                          {isRestActive && (
+                                            <motion.div
+                                              key={restKey}
+                                              initial={{ opacity: 0, height: 0, scale: 0.95 }}
+                                              animate={{ opacity: 1, height: 'auto', scale: 1 }}
+                                              exit={{ opacity: 0, height: 0, scale: 0.95 }}
+                                              transition={{ duration: 0.25, ease: 'easeOut' }}
+                                              className="overflow-hidden"
                                             >
-                                              <CheckCircle2 size={20} className={set.completed ? "fill-primary-foreground/20" : ""} />
-                                            </button>
-                                          </>
-                                        )}
+                                              <RestCountdown
+                                                key={restKey}
+                                                defaultSeconds={restDuration}
+                                                onFinish={() => setActiveRestKey(null)}
+                                              />
+                                            </motion.div>
+                                          )}
+                                        </AnimatePresence>
                                       </div>
                                       );
                                     })}
