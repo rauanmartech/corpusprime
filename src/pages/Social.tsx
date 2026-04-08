@@ -493,54 +493,58 @@ export default function Social() {
                <div className="w-10" />
             </div>
 
-            <div className="flex-1 flex flex-col gap-6">
-              <div className="aspect-square w-full rounded-[2.5rem] overflow-hidden border-2 border-blood-red shadow-red-glow bg-card">
-                 {imagePreview && (
-                   <img src={imagePreview} className="w-full h-full object-cover" />
-                 )}
-              </div>
-
-              <div className="space-y-4">
-                <div className="bg-card border border-border/40 rounded-2xl p-4 focus-within:border-blood-red/40 transition-colors">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block mb-2">Legenda (Max 50 chars)</label>
-                  <textarea 
-                    value={statusCaption}
-                    onChange={(e) => setStatusCaption(e.target.value.slice(0, 50))}
-                    placeholder="Sua vitória de hoje..."
-                    className="w-full bg-transparent outline-none text-sm font-medium resize-none"
-                    rows={2}
-                  />
-                  <div className="flex justify-end mt-1">
-                    <span className="text-[10px] font-bold text-muted-foreground">
-                      {statusCaption.length}/50
-                    </span>
-                  </div>
+            <div className="flex-1 flex flex-col overflow-y-auto pb-4 scrollbar-hide">
+              <div className="flex flex-col gap-6 min-h-max">
+                <div className="aspect-square w-full shrink-0 rounded-[2.5rem] overflow-hidden border-2 border-blood-red shadow-red-glow bg-card">
+                   {imagePreview && (
+                     <img src={imagePreview} className="w-full h-full object-cover" />
+                   )}
                 </div>
 
-                <div className="flex items-center justify-between bg-card border border-border/40 rounded-2xl p-4">
-                  <div className="flex items-center gap-3">
-                    <Shield size={18} className="text-blue-500" />
-                    <div>
-                       <p className="text-xs font-bold">Privacidade</p>
-                       <p className="text-[10px] text-muted-foreground">Apenas amigos podem ver</p>
+                <div className="space-y-4 shrink-0">
+                  <div className="bg-card border border-border/40 rounded-2xl p-4 focus-within:border-blood-red/40 transition-colors">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block mb-2">Legenda (Max 50 chars)</label>
+                    <textarea 
+                      value={statusCaption}
+                      onChange={(e) => setStatusCaption(e.target.value.slice(0, 50))}
+                      placeholder="Sua vitória de hoje..."
+                      className="w-full bg-transparent outline-none text-sm font-medium resize-none"
+                      rows={2}
+                    />
+                    <div className="flex justify-end mt-1">
+                      <span className="text-[10px] font-bold text-muted-foreground">
+                        {statusCaption.length}/50
+                      </span>
                     </div>
                   </div>
+
+                  <div className="flex items-center justify-between bg-card border border-border/40 rounded-2xl p-4">
+                    <div className="flex items-center gap-3">
+                      <Shield size={18} className="text-blue-500" />
+                      <div>
+                         <p className="text-xs font-bold">Privacidade</p>
+                         <p className="text-[10px] text-muted-foreground">Apenas amigos podem ver</p>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => setIsPrivate(!isPrivate)}
+                      className={`w-12 h-6 rounded-full p-1 transition-colors ${isPrivate ? 'bg-blue-500' : 'bg-muted'}`}
+                    >
+                      <div className={`w-4 h-4 rounded-full bg-white transition-transform ${isPrivate ? 'translate-x-6' : 'translate-x-0'}`} />
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="mt-auto pt-6 shrink-0">
                   <button 
-                    onClick={() => setIsPrivate(!isPrivate)}
-                    className={`w-12 h-6 rounded-full p-1 transition-colors ${isPrivate ? 'bg-blue-500' : 'bg-muted'}`}
+                    onClick={uploadStatus}
+                    disabled={uploadingStatus || !statusCaption}
+                    className="w-full bg-blood-red text-white py-5 rounded-[2rem] font-black uppercase tracking-[0.2em] shadow-red-glow flex items-center justify-center gap-3 disabled:opacity-50 disabled:grayscale"
                   >
-                    <div className={`w-4 h-4 rounded-full bg-white transition-transform ${isPrivate ? 'translate-x-6' : 'translate-x-0'}`} />
+                    {uploadingStatus ? <Loader2 className="animate-spin" /> : <><Send size={18} /> POSTAR VITÓRIA</>}
                   </button>
                 </div>
               </div>
-              
-              <button 
-                onClick={uploadStatus}
-                disabled={uploadingStatus || !statusCaption}
-                className="w-full bg-blood-red text-white py-5 rounded-[2rem] font-black uppercase tracking-[0.2em] shadow-red-glow flex items-center justify-center gap-3 disabled:opacity-50 disabled:grayscale"
-              >
-                {uploadingStatus ? <Loader2 className="animate-spin" /> : <><Send size={18} /> POSTAR VITÓRIA</>}
-              </button>
             </div>
           </motion.div>
         )}
