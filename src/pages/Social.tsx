@@ -47,7 +47,7 @@ export default function Social() {
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isPrivate, setIsPrivate] = useState(false);
-  const [viewingPhoto, setViewingPhoto] = useState<string | null>(null);
+  const [viewingStatusIndex, setViewingStatusIndex] = useState<number | null>(null);
   
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -295,7 +295,7 @@ export default function Social() {
             >
               <div 
                 className="w-28 h-28 rounded-[2rem] overflow-hidden border-2 border-blood-red shadow-red-glow relative cursor-pointer"
-                onClick={() => setViewingPhoto(status.metadata?.photo_url)}
+                onClick={() => setViewingStatusIndex(i)}
               >
                 <img 
                   src={status.metadata?.photo_url} 
@@ -482,29 +482,112 @@ export default function Social() {
           </div>
         )}
 
-        {viewingPhoto && (
+        {viewingStatusIndex !== null && statuses[viewingStatusIndex] && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={() => setViewingPhoto(null)}
-            className="fixed inset-0 z-[120] bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 cursor-zoom-out"
+            drag="y"
+            dragConstraints={{ top: 0, bottom: 0 }}
+            onDragEnd={(e, info) => {
+              if (info.offset.y > 100) {
+                setViewingStatusIndex(null);
+              }
+            }}
+            className="fixed inset-0 z-[120] bg-black flex flex-col justify-between"
           >
-            <button 
-              onClick={() => setViewingPhoto(null)}
-              className="absolute top-6 right-6 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white z-10"
-            >
-              <X size={20} />
-            </button>
-            <motion.img 
-              initial={{ scale: 0.9 }}
-              animate={{ scale: 1 }}
-              exit={{ scale: 0.9 }}
-              src={viewingPhoto} 
-              alt="Full size status" 
-              className="max-w-full max-h-[85vh] object-contain rounded-2xl cursor-default"
-              onClick={(e) => e.stopPropagation()}
-            />
+            {/* Background Image / Main Image */}
+            <div className="absolute inset-0 z-0">
+              <img 
+                src={statuses[viewingStatusIndex].metadata?.photo_url} 
+                alt="Story" 
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/80" />
+            </div>
+
+            {/* Top Bar with Progress Indicators and Back Button */}
+            <div className="relative z-10 w-full pt-12 px-4 flex flex-col gap-4">
+              <div className="flex gap-1">
+                {statuses.map((_, idx) => (
+                  <div key={idx} className="h-1 flex-1 bg-white/30 rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full bg-white transition-all duration-300 ${idx <= viewingStatusIndex ? 'w-full' : 'w-0'}`} 
+                    />
+                  </div>
+                ))}
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full border border-white/20 overflow-hidden bg-muted">
+                    {statuses[viewingStatusIndex].profiles?.avatar_url ? (
+                      <img src={statuses[viewingStatusIndex].profiles.avatar_url} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full bg-blood-red/10 flex items-center justify-center">
+                        <span className="text-[10px] font-bold text-blood-red">AT</span>
+                      </div>
+                     )}
+                  </div>
+                  <div>
+                    <h3 className="text-white font-bold text-sm shadow-sm">{statuses[viewingStatusIndex].profiles?.full_name}</h3>
+                    <p className="text-white/70 text-xs">{new Date(statuses[viewingStatusIndex].created_at).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' })}</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setViewingStatusIndex(null)}
+                  className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center text-white z-10 hover:bg-black/60 transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+
+            {/* Navigation Overlays */}
+            <div className="absolute inset-0 z-10 flex pt-24 pb-32">
+              <div 
+                className="w-1/3 h-full cursor-pointer" 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (viewingStatusIndex > 0) {
+                    setViewingStatusIndex(viewingStatusIndex - 1);
+                  }
+                }}
+              />
+              <div 
+                className="w-2/3 h-full cursor-pointer" 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (viewingStatusIndex < statuses.length - 1) {
+                    setViewingStatusIndex(viewingStatusIndex + 1);
+                  } else {
+                    setViewingStatusIndex(null);
+                  }
+                }}
+              />
+            </div>
+
+            {/* Bottom Content Area */}
+            <div className="relative z-10 p-6 mb-8 w-full pointer-events-none">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={viewingStatusIndex}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  className="bg-black/40 backdrop-blur-md border border-white/10 rounded-[2rem] p-5 shadow-2xl pointer-events-auto"
+                >
+                  <div className="flex items-start gap-4">
+                     <div className="w-12 h-12 rounded-2xl bg-blood-red text-white flex items-center justify-center shrink-0">
+                       <Trophy size={20} />
+                     </div>
+                     <div>
+                       <h4 className="text-white font-black uppercase text-sm mb-1 line-clamp-1">{statuses[viewingStatusIndex].title}</h4>
+                       <p className="text-white/80 text-sm font-medium">{statuses[viewingStatusIndex].description}</p>
+                     </div>
+                  </div>
+                </motion.div>
+              </AnimatePresence>
+            </div>
           </motion.div>
         )}
 
