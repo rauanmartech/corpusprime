@@ -47,6 +47,7 @@ export default function Social() {
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isPrivate, setIsPrivate] = useState(false);
+  const [viewingPhoto, setViewingPhoto] = useState<string | null>(null);
   
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -292,11 +293,14 @@ export default function Social() {
               transition={{ delay: i * 0.05 }}
               className="flex-shrink-0 w-28 flex flex-col gap-2"
             >
-              <div className="w-28 h-28 rounded-[2rem] overflow-hidden border-2 border-blood-red shadow-red-glow relative">
+              <div 
+                className="w-28 h-28 rounded-[2rem] overflow-hidden border-2 border-blood-red shadow-red-glow relative cursor-pointer"
+                onClick={() => setViewingPhoto(status.metadata?.photo_url)}
+              >
                 <img 
                   src={status.metadata?.photo_url} 
                   alt="Status" 
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover pointer-events-none"
                   loading="lazy"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-2 px-3">
@@ -371,7 +375,7 @@ export default function Social() {
 
               <div className="space-y-2">
                 <h3 className="text-[11px] font-display font-black text-foreground uppercase tracking-tight leading-tight">
-                  <span className="text-blood-red">{event.profiles?.full_name || "Membro"}</span> {event.title}
+                  <span className="text-blood-red">{event.profiles?.full_name || "Membro"}</span> {event.title?.split('; [')[0]}
                 </h3>
               </div>
 
@@ -476,6 +480,32 @@ export default function Social() {
               </button>
             </motion.div>
           </div>
+        )}
+
+        {viewingPhoto && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setViewingPhoto(null)}
+            className="fixed inset-0 z-[120] bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 cursor-zoom-out"
+          >
+            <button 
+              onClick={() => setViewingPhoto(null)}
+              className="absolute top-6 right-6 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white z-10"
+            >
+              <X size={20} />
+            </button>
+            <motion.img 
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.9 }}
+              src={viewingPhoto} 
+              alt="Full size status" 
+              className="max-w-full max-h-[85vh] object-contain rounded-2xl cursor-default"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </motion.div>
         )}
 
         {showUploadModal && (

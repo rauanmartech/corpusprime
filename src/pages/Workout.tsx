@@ -934,13 +934,10 @@ export default function Workout() {
 
         // 5. Feedback Visual e Conquistas
         if (result && result.is_first_of_day) {
-          const now = new Date();
-          const p_timestamp = `[${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}] - [${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}]`;
-          
           await supabase.from('community_events').insert([{
             user_id: session.user.id,
             event_type: 'workout',
-            title: `Finalizou o treino: ${todayWorkout.name}; ${p_timestamp}`,
+            title: `Finalizou o treino: ${todayWorkout.name}`,
             description: `Completou sua ${result.total_sessions}ª sessão de treino! 🔥`,
             metadata: { workout_name: todayWorkout.name, total_sessions: result.total_sessions }
           }]);
