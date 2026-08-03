@@ -38,7 +38,8 @@ export default function BottomNav() {
                 className={isActive ? "text-primary" : "text-graphite-muted"}
               />
               <span
-                className={`text-[10px] font-medium ${
+                translate="no"
+                className={`notranslate text-[10px] font-medium ${
                   isActive ? "text-primary" : "text-graphite-muted"
                 }`}
               >
