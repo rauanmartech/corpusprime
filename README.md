@@ -1,10 +1,22 @@
-# Corpus Prime
+# Corpus Prime — Plataforma de Performance Atlética & Sistema Integrado
+
+[![React](https://img.shields.io/badge/React-18.3.1-61DAFB?style=flat&logo=react&logoColor=white&labelColor=23272f)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?style=flat&logo=typescript&logoColor=white&labelColor=23272f)](https://www.typescriptlang.org/)
+[![Vite](https://img.shields.io/badge/Vite-5.4-646CFF?style=flat&logo=vite&logoColor=white&labelColor=23272f)](https://vitejs.dev/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-38B2AC?style=flat&logo=tailwindcss&logoColor=white&labelColor=23272f)](https://tailwindcss.com/)
+[![Supabase](https://img.shields.io/badge/Supabase-Database_%26_Auth-3ECF8E?style=flat&logo=supabase&logoColor=white&labelColor=23272f)](https://supabase.com/)
+[![TanStack Query](https://img.shields.io/badge/TanStack_Query-v5-FF4154?style=flat&logo=reactquery&logoColor=white&labelColor=23272f)](https://tanstack.com/query)
+[![Lucide Icons](https://img.shields.io/badge/Lucide_Icons-0.462-F56565?style=flat&logo=lucide&logoColor=white&labelColor=23272f)](https://lucide.dev/)
+[![PWA Ready](https://img.shields.io/badge/PWA-Offline--First-5A0FC8?style=flat&logo=pwa&logoColor=white&labelColor=23272f)](https://web.dev/progressive-web-apps/)
+[![Vitest](https://img.shields.io/badge/Vitest-3.2-6E9F18?style=flat&logo=vitest&logoColor=white&labelColor=23272f)](https://vitest.dev/)
+
+---
 
 Plataforma mobile-first para prescrição, tracking de treinamento de força, periodização atlética, cálculo de sobrecarga progressiva (e1RM), gamificação de consistência e engajamento comunitário.
 
 ---
 
-## Visão Geral
+## <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/scan-eye.svg" width="22" height="22" align="center" /> Visão Geral
 
 O **Corpus Prime** foi desenvolvido para preencher a lacuna entre planilhas estáticas de treino e aplicativos genéricos de fitness. Focado em atletas e praticantes avançados de musculação, o sistema implementa registro rigoroso de séries, repetições e percepção subjetiva de esforço (RPE), calculando automaticamente a estimativa de 1 Repetição Máxima (e1RM) com base na fórmula de Epley.
 
@@ -12,37 +24,37 @@ A aplicação opera sob uma arquitetura híbrida **Offline-First (PWA)**, permit
 
 ---
 
-## Principais Funcionalidades
+## <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/sparkles.svg" width="22" height="22" align="center" /> Principais Funcionalidades
 
-### 1. Gestão e Execução de Treinos
+### <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/dumbbell.svg" width="18" height="18" align="center" /> 1. Gestão e Execução de Treinos
 - **Rotinas Estruturadas**: Divisão de treinos por grupamentos musculares, séries alvo, repetições e intervalos de descanso.
 - **Rascunho de Treino Ativo**: Persistência do estado do treino em tempo real, evitando perda de progresso em caso de fechamento acidental ou reload.
 - **Temporizador de Descanso Integrado**: Cronômetro contextual com notificações visuais e sonoras.
 - **Cálculo de e1RM Automático**: Estimativa de carga máxima teórica por série executada via `$e1RM = \text{Peso} \times (1 + \frac{\text{Reps}}{30})$.
 
-### 2. Análise de Performance e Evolução
+### <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/trending-up.svg" width="18" height="18" align="center" /> 2. Análise de Performance e Evolução
 - **Curva de Carga por Exercício**: Gráficos temporais de evolução de carga máxima e volume acumulado.
 - **Métricas Corporais**: Acompanhamento de peso, percentual de gordura e massa magra com cálculo de tendência.
 - **Histórico Completo**: Visualização detalhada de sessões anteriores, tonelagem total e exercícios realizados.
 
-### 3. Gamificação e Consistência
+### <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/flame.svg" width="18" height="18" align="center" /> 3. Gamificação e Consistência
 - **Atomic Streak Engine**: Função RPC transacional no Postgres com lock (`FOR UPDATE`) para evitar duplicidade e manipulação de sequências diárias.
 - **Catálogo de Conquistas**: Sistema de badges categorizados por consistência e performance com ganho de XP e níveis.
 - **Níveis e Progressão**: Progressão dinâmica de nível calculada a cada sessão completada.
 
-### 4. Comunidade e Social
+### <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/users.svg" width="18" height="18" align="center" /> 4. Comunidade e Social
 - **Feed de Atividades**: Compartilhamento em tempo real de treinos concluídos, novos recordes (PRs) e conquistas desbloqueadas.
 - **Feed Interativo**: Sistema de reações e incentivo mútuo entre membros.
 - **Perfis Públicos**: Visualização de estatísticas, nível e histórico esportivo.
 
-### 5. Arquitetura PWA & Offline-First
+### <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/smartphone.svg" width="18" height="18" align="center" /> 5. Arquitetura PWA & Offline-First
 - **Instalação Nativa**: Suporte a PWA standalone com manifesto web, splash screen e ícones adaptativos.
 - **Estratégia de Cache**: Service Worker com runtime caching (NetworkFirst) para requisições de API e CacheFirst para assets estáticos.
 - **Cache Local de Sessão**: Armazenamento local de rotinas e rascunhos para operação sem internet.
 
 ---
 
-## Arquitetura do Sistema
+## <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/cpu.svg" width="22" height="22" align="center" /> Arquitetura do Sistema
 
 ```mermaid
 flowchart TD
@@ -71,7 +83,7 @@ flowchart TD
 
 ---
 
-## Fluxo de Dados e Ciclo do Treino
+## <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/git-commit.svg" width="22" height="22" align="center" /> Fluxo de Dados e Ciclo do Treino
 
 ```mermaid
 sequenceDiagram
@@ -95,24 +107,24 @@ sequenceDiagram
 
 ---
 
-## Stack Tecnológica
+## <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/layers.svg" width="22" height="22" align="center" /> Stack Tecnológica
 
 | Camada | Tecnologia | Propósito |
 | :--- | :--- | :--- |
-| **Core Runtime** | React 18, TypeScript 5.8 | Interface reativa com tipagem estática rigorosa |
-| **Build & Bundler** | Vite 5, SWC Plugin | Compilação ultrarrápida e Hot Module Replacement |
-| **Estilização** | Tailwind CSS, CSS Variables | Design system responsivo e mobile-first |
-| **Componentes UI** | Radix UI Primitives, Lucide Icons | Componentes acessíveis, consistentes e sem emojis |
-| **Animações** | Framer Motion | Microinterações de alta fidelidade e transições de página |
-| **Data Fetching** | TanStack Query v5 | Cache assíncrono, sincronização e invalidação de queries |
-| **Backend & DB** | Supabase (PostgreSQL 15) | Banco relacional, autenticação JWT, RLS e Storage |
-| **PWA & Offline** | Vite Plugin PWA, Workbox | Service worker, cache estático e suporte offline |
-| **Validação** | Zod, React Hook Form | Validação de formulários e schemas type-safe |
-| **Testes** | Vitest, Testing Library | Testes unitários e de integração com ambiente JSDom |
+| **Core Runtime** | [![React](https://img.shields.io/badge/React-18.3.1-61DAFB?style=flat-square&logo=react&logoColor=white&labelColor=23272f)](https://react.dev/) [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?style=flat-square&logo=typescript&logoColor=white&labelColor=23272f)](https://www.typescriptlang.org/) | Interface reativa com tipagem estática rigorosa |
+| **Build & Bundler** | [![Vite](https://img.shields.io/badge/Vite-5.4-646CFF?style=flat-square&logo=vite&logoColor=white&labelColor=23272f)](https://vitejs.dev/) [![SWC](https://img.shields.io/badge/SWC-Plugin-F3D03E?style=flat-square&logo=swc&logoColor=black&labelColor=23272f)](https://swc.rs/) | Compilação ultrarrápida e Hot Module Replacement |
+| **Estilização** | [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-38B2AC?style=flat-square&logo=tailwindcss&logoColor=white&labelColor=23272f)](https://tailwindcss.com/) | Design system responsivo e mobile-first com variáveis CSS |
+| **Componentes UI** | [![Radix UI](https://img.shields.io/badge/Radix_UI-Primitives-161618?style=flat-square&logo=radix-ui&logoColor=white&labelColor=23272f)](https://www.radix-ui.com/) [![Lucide](https://img.shields.io/badge/Lucide_Icons-0.462-F56565?style=flat-square&logo=lucide&logoColor=white&labelColor=23272f)](https://lucide.dev/) | Primitivas WAI-ARIA e iconografia consistente |
+| **Animações** | [![Framer Motion](https://img.shields.io/badge/Framer_Motion-11-0055FF?style=flat-square&logo=framer&logoColor=white&labelColor=23272f)](https://www.framer.com/motion/) | Microinterações de alta fidelidade e transições de página |
+| **Data Fetching** | [![TanStack Query](https://img.shields.io/badge/TanStack_Query-v5-FF4154?style=flat-square&logo=reactquery&logoColor=white&labelColor=23272f)](https://tanstack.com/query) | Cache assíncrono, sincronização e invalidação de queries |
+| **Backend & DB** | [![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL_15-3ECF8E?style=flat-square&logo=supabase&logoColor=white&labelColor=23272f)](https://supabase.com/) | Banco relacional, autenticação JWT, RLS e Storage |
+| **PWA & Offline** | [![PWA](https://img.shields.io/badge/PWA-Workbox-5A0FC8?style=flat-square&logo=pwa&logoColor=white&labelColor=23272f)](https://developer.chrome.com/docs/workbox/) | Service worker, cache estático e suporte offline |
+| **Validação** | [![Zod](https://img.shields.io/badge/Zod-3.25-3E67B1?style=flat-square&logo=zod&logoColor=white&labelColor=23272f)](https://zod.dev/) [![React Hook Form](https://img.shields.io/badge/React_Hook_Form-7.61-EC5990?style=flat-square&logo=reacthookform&logoColor=white&labelColor=23272f)](https://react-hook-form.com/) | Validação de formulários e schemas type-safe |
+| **Testes** | [![Vitest](https://img.shields.io/badge/Vitest-3.2-6E9F18?style=flat-square&logo=vitest&logoColor=white&labelColor=23272f)](https://vitest.dev/) [![Testing Library](https://img.shields.io/badge/Testing_Library-16-E33332?style=flat-square&logo=testing-library&logoColor=white&labelColor=23272f)](https://testing-library.com/) | Testes unitários e de integração com ambiente JSDom |
 
 ---
 
-## Estrutura do Repositório
+## <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/folder-tree.svg" width="22" height="22" align="center" /> Estrutura do Repositório
 
 ```text
 corpus-prime/
@@ -164,7 +176,7 @@ corpus-prime/
 
 ---
 
-## Configuração do Ambiente de Desenvolvimento
+## <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/terminal.svg" width="22" height="22" align="center" /> Configuração do Ambiente de Desenvolvimento
 
 ### Pré-requisitos
 - **Node.js**: Versão 18.0.0 ou superior
@@ -199,7 +211,7 @@ Acesse o **SQL Editor** no painel do Supabase e execute os scripts contidos em [
 
 ---
 
-## Scripts Disponíveis
+## <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/play.svg" width="22" height="22" align="center" /> Scripts Disponíveis
 
 | Comando | Descrição |
 | :--- | :--- |
@@ -212,7 +224,7 @@ Acesse o **SQL Editor** no painel do Supabase e execute os scripts contidos em [
 
 ---
 
-## Decisões Técnicas e Trade-offs de Engenharia
+## <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/shield-check.svg" width="22" height="22" align="center" /> Decisões Técnicas e Trade-offs de Engenharia
 
 ### 1. Atomicidade no Registro de Treinos e Sequências
 A computação de dias consecutivos de treino (streaks) e distribuição de experiência (XP) foi encapsulada na função PostgreSQL `process_workout_completion` com lock transacional (`SELECT ... FOR UPDATE`). Isso elimina race conditions decorrentes de múltiplos cliques no client e impede fraudes de data enviadas pelo navegador.
@@ -228,6 +240,7 @@ A interface foi estruturada com componentes primitivos do Radix UI, garantindo a
 
 ---
 
-## Licença
+## <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/scale.svg" width="22" height="22" align="center" /> Licença
 
 Este projeto está sob a licença [MIT](./LICENSE).
+
