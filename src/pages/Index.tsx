@@ -278,7 +278,7 @@ export default function Index() {
               <ResponsiveContainer width="100%" height="100%" debounce={100}>
                 <LineChart data={chartData} margin={{ top: 5, right: -15, left: -25, bottom: 0 }}>
                   <XAxis dataKey="date" tick={{ fontSize: 9, fill: "hsl(220 5% 60%)", fontWeight: 'bold' }} axisLine={false} tickLine={false} />
-                  <YAxis yAxisId="left" tickFormatter={(value) => `${value} kg`} tick={{ fontSize: 9, fill: "hsl(220 5% 60%)", fontWeight: 'bold' }} axisLine={false} tickLine={false} />
+                  <YAxis yAxisId="left" tickFormatter={(value) => `${value} kg`} tick={{ fontSize: 9, fill: "hsl(220 5% 60%)", fontWeight: 'bold' }} axisLine={false} tickLine={false} />
                   <YAxis yAxisId="right" orientation="right" tickFormatter={(value) => `${value}%`} tick={{ fontSize: 9, fill: "hsl(220 5% 60%)", fontWeight: 'bold' }} axisLine={false} tickLine={false} />
                   <Tooltip contentStyle={{ borderRadius: "16px", border: "none", boxShadow: "0 10px 40px rgba(0,0,0,0.1)", fontSize: "11px", fontWeight: 'bold' }} />
                   <Legend verticalAlign="top" align="right" height={30} iconSize={6} wrapperStyle={{ fontSize: '8px', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '0.05em' }} />

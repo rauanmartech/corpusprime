@@ -233,7 +233,7 @@ export default function Profile() {
     const diff = current - prev;
     if (diff === 0) return { text: "Mesmo", color: "text-muted-foreground" };
     const isPositive = diff > 0;
-    let color = isPositive ? (inverseGood ? "text-blood-red" : "text-success") : (inverseGood ? "text-success" : "text-blood-red");
+    const color = isPositive ? (inverseGood ? "text-blood-red" : "text-success") : (inverseGood ? "text-success" : "text-blood-red");
     return { text: `${isPositive ? "+" : ""}${diff.toFixed(1)}`, color };
   };
 

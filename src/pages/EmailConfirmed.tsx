@@ -41,8 +41,8 @@ export default function EmailConfirmed() {
         </h1>
         
         <p className="text-muted-foreground mb-10 leading-relaxed">
-          Sua conta foi validada com sucesso. Agora você faz parte da elite 
-          <span className="text-foreground font-semibold"> Evolve Strong</span>.
+          Sua conta foi validada com sucesso. Bem-vindo ao 
+          <span className="text-foreground font-semibold"> Corpus Prime</span>.
         </p>
 
         <div className="space-y-4">

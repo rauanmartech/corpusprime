@@ -1,9 +1,24 @@
--- 1. Atualizar a tabela user_stats para suportar streaks longos.
-ALTER TABLE public.user_stats 
-ADD COLUMN IF NOT EXISTS longest_streak INT DEFAULT 0;
+-- ==============================================================================
+-- 04: ATOMIC STREAK, XP & LEVELING RPC FUNCTION
+-- ==============================================================================
 
--- 2. Função RPC segura para computar finalizar treinos Atômicamente
--- Impede Duplicidades, gerencia o Streak local e entrega o Leveling unificado.
+-- 1. Ensure user_stats table has necessary tracking fields
+CREATE TABLE IF NOT EXISTS public.user_stats (
+    user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    streak INT DEFAULT 0,
+    longest_streak INT DEFAULT 0,
+    xp INT DEFAULT 0,
+    level INT DEFAULT 1,
+    total_sessions INT DEFAULT 0,
+    last_sync_date DATE,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+ALTER TABLE public.user_stats ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can read own stats" ON public.user_stats;
+CREATE POLICY "Users can read own stats" ON public.user_stats FOR SELECT USING (auth.uid() = user_id);
+
+-- 2. Atomic workout completion processor with row locking against race conditions
 CREATE OR REPLACE FUNCTION process_workout_completion(p_user_id UUID, p_client_date DATE)
 RETURNS jsonb AS $$
 DECLARE
@@ -16,14 +31,14 @@ DECLARE
     v_is_first BOOLEAN := FALSE;
     v_result jsonb;
 BEGIN
-    -- Bloqueia a linha do usuário contra requisições simultâneas (Race conditions lock)
+    -- Row-level locking to prevent race conditions during rapid submissions
     SELECT last_sync_date, streak, longest_streak, xp, level, total_sessions
     INTO v_last_date, v_streak, v_longest, v_xp, v_level, v_sessions
     FROM public.user_stats 
     WHERE user_id = p_user_id
     FOR UPDATE;
 
-    -- Se não existir registro em user_stats (primeiro uso), insere com defaults e dá como first_of_day
+    -- If user_stats does not exist yet, provision with initial values
     IF NOT FOUND THEN
         v_streak := 1;
         v_longest := 1;
@@ -45,34 +60,33 @@ BEGIN
         RETURN v_result;
     END IF;
 
-    -- Proteções de Nulos (Garante que colunas default tenham número)
+    -- Null-safety guards
     v_streak := COALESCE(v_streak, 0);
     v_longest := COALESCE(v_longest, 0);
     v_xp := COALESCE(v_xp, 0);
     v_level := COALESCE(v_level, 1);
     v_sessions := COALESCE(v_sessions, 0);
 
-    -- Lógica de Engajamento e Sequência
+    -- Streak and streak continuity logic
     IF v_last_date IS NULL THEN
-        -- Nunca teve data (migração de users velhos)
         v_streak := 1;
         v_longest := GREATEST(v_longest, 1);
         v_is_first := TRUE;
     ELSIF v_last_date = p_client_date - INTERVAL '1 day' THEN
-        -- Treinou ontem
+        -- Trained yesterday: increment streak
         v_streak := v_streak + 1;
         v_longest := GREATEST(v_longest, v_streak);
         v_is_first := TRUE;
     ELSIF v_last_date >= p_client_date THEN
-        -- Já treinou hoje (Bloqueio) ou client data bugada
+        -- Already completed a session today
         v_is_first := FALSE;
     ELSE
-        -- Faltou 1 ou mais dias. Reseta.
+        -- Missed 1+ days: reset streak to 1
         v_streak := 1;
         v_is_first := TRUE;
     END IF;
 
-    -- Atualiza DB se for o primeiro do dia
+    -- Update stats if first session of the day
     IF v_is_first THEN
         v_xp := v_xp + 150;
         v_level := FLOOR(v_xp / 1500) + 1;
@@ -89,7 +103,6 @@ BEGIN
         WHERE user_id = p_user_id;
     END IF;
 
-    -- Retorna JSON pro Client
     v_result := jsonb_build_object(
         'new_streak', v_streak,
         'new_xp', v_xp,

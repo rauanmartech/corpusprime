@@ -1,5 +1,5 @@
 /**
- * Evolve Strong - Cache System
+ * Corpus Prime - Offline Cache System
  * Engineered for high-availability and offline-first workout tracking.
  */
 

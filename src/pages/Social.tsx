@@ -248,7 +248,7 @@ export default function Social() {
           </button>
           <div>
             <h1 className="text-2xl font-display font-bold text-foreground">Social</h1>
-            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">A Tribo Evolve</p>
+            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Comunidade Corpus</p>
           </div>
         </div>
         <button 

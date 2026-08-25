@@ -1,5 +1,8 @@
--- View para extrair a progressão de carga máxima de cada exercício por sessão de treino.
--- Criamos a View com 'security_invoker = true' para herdar sua privacidade de conta automaticamente.
+-- ==============================================================================
+-- 03: EXERCISE PROGRESSION & EVOLUTION VIEWS
+-- ==============================================================================
+
+-- Secure view with security_invoker = true for progressive overload charting
 CREATE OR REPLACE VIEW public.user_exercise_progression WITH (security_invoker = true) AS
 SELECT 
     l.exercise_id,
