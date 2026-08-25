@@ -16,7 +16,7 @@ Plataforma mobile-first para prescrição, tracking de treinamento de força, pe
 
 ---
 
-## <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/scan-eye.svg" width="22" height="22" align="center" /> Visão Geral
+## <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/scan-eye.svg" width="22" height="22" valign="middle" style="vertical-align: middle; display: inline-block; margin-right: 6px;" /> Visão Geral
 
 O **Corpus Prime** foi desenvolvido para preencher a lacuna entre planilhas estáticas de treino e aplicativos genéricos de fitness. Focado em atletas e praticantes avançados de musculação, o sistema implementa registro rigoroso de séries, repetições e percepção subjetiva de esforço (RPE), calculando automaticamente a estimativa de 1 Repetição Máxima (e1RM) com base na fórmula de Epley.
 
@@ -24,37 +24,37 @@ A aplicação opera sob uma arquitetura híbrida **Offline-First (PWA)**, permit
 
 ---
 
-## <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/sparkles.svg" width="22" height="22" align="center" /> Principais Funcionalidades
+## <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/sparkles.svg" width="22" height="22" valign="middle" style="vertical-align: middle; display: inline-block; margin-right: 6px;" /> Principais Funcionalidades
 
-### <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/dumbbell.svg" width="18" height="18" align="center" /> 1. Gestão e Execução de Treinos
+### <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/dumbbell.svg" width="18" height="18" valign="middle" style="vertical-align: middle; display: inline-block; margin-right: 6px;" /> 1. Gestão e Execução de Treinos
 - **Rotinas Estruturadas**: Divisão de treinos por grupamentos musculares, séries alvo, repetições e intervalos de descanso.
 - **Rascunho de Treino Ativo**: Persistência do estado do treino em tempo real, evitando perda de progresso em caso de fechamento acidental ou reload.
 - **Temporizador de Descanso Integrado**: Cronômetro contextual com notificações visuais e sonoras.
 - **Cálculo de e1RM Automático**: Estimativa de carga máxima teórica por série executada via `$e1RM = \text{Peso} \times (1 + \frac{\text{Reps}}{30})$.
 
-### <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/trending-up.svg" width="18" height="18" align="center" /> 2. Análise de Performance e Evolução
+### <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/trending-up.svg" width="18" height="18" valign="middle" style="vertical-align: middle; display: inline-block; margin-right: 6px;" /> 2. Análise de Performance e Evolução
 - **Curva de Carga por Exercício**: Gráficos temporais de evolução de carga máxima e volume acumulado.
 - **Métricas Corporais**: Acompanhamento de peso, percentual de gordura e massa magra com cálculo de tendência.
 - **Histórico Completo**: Visualização detalhada de sessões anteriores, tonelagem total e exercícios realizados.
 
-### <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/flame.svg" width="18" height="18" align="center" /> 3. Gamificação e Consistência
+### <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/flame.svg" width="18" height="18" valign="middle" style="vertical-align: middle; display: inline-block; margin-right: 6px;" /> 3. Gamificação e Consistência
 - **Atomic Streak Engine**: Função RPC transacional no Postgres com lock (`FOR UPDATE`) para evitar duplicidade e manipulação de sequências diárias.
 - **Catálogo de Conquistas**: Sistema de badges categorizados por consistência e performance com ganho de XP e níveis.
 - **Níveis e Progressão**: Progressão dinâmica de nível calculada a cada sessão completada.
 
-### <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/users.svg" width="18" height="18" align="center" /> 4. Comunidade e Social
+### <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/users.svg" width="18" height="18" valign="middle" style="vertical-align: middle; display: inline-block; margin-right: 6px;" /> 4. Comunidade e Social
 - **Feed de Atividades**: Compartilhamento em tempo real de treinos concluídos, novos recordes (PRs) e conquistas desbloqueadas.
 - **Feed Interativo**: Sistema de reações e incentivo mútuo entre membros.
 - **Perfis Públicos**: Visualização de estatísticas, nível e histórico esportivo.
 
-### <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/smartphone.svg" width="18" height="18" align="center" /> 5. Arquitetura PWA & Offline-First
+### <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/smartphone.svg" width="18" height="18" valign="middle" style="vertical-align: middle; display: inline-block; margin-right: 6px;" /> 5. Arquitetura PWA & Offline-First
 - **Instalação Nativa**: Suporte a PWA standalone com manifesto web, splash screen e ícones adaptativos.
 - **Estratégia de Cache**: Service Worker com runtime caching (NetworkFirst) para requisições de API e CacheFirst para assets estáticos.
 - **Cache Local de Sessão**: Armazenamento local de rotinas e rascunhos para operação sem internet.
 
 ---
 
-## <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/cpu.svg" width="22" height="22" align="center" /> Arquitetura do Sistema
+## <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/cpu.svg" width="22" height="22" valign="middle" style="vertical-align: middle; display: inline-block; margin-right: 6px;" /> Arquitetura do Sistema
 
 ```mermaid
 flowchart TD
@@ -83,7 +83,7 @@ flowchart TD
 
 ---
 
-## <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/git-commit.svg" width="22" height="22" align="center" /> Fluxo de Dados e Ciclo do Treino
+## <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/activity.svg" width="22" height="22" valign="middle" style="vertical-align: middle; display: inline-block; margin-right: 6px;" /> Fluxo de Dados e Ciclo do Treino
 
 ```mermaid
 sequenceDiagram
@@ -107,7 +107,7 @@ sequenceDiagram
 
 ---
 
-## <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/layers.svg" width="22" height="22" align="center" /> Stack Tecnológica
+## <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/layers.svg" width="22" height="22" valign="middle" style="vertical-align: middle; display: inline-block; margin-right: 6px;" /> Stack Tecnológica
 
 | Camada | Tecnologia | Propósito |
 | :--- | :--- | :--- |
@@ -124,7 +124,7 @@ sequenceDiagram
 
 ---
 
-## <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/folder-tree.svg" width="22" height="22" align="center" /> Estrutura do Repositório
+## <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/folder-tree.svg" width="22" height="22" valign="middle" style="vertical-align: middle; display: inline-block; margin-right: 6px;" /> Estrutura do Repositório
 
 ```text
 corpus-prime/
@@ -176,7 +176,7 @@ corpus-prime/
 
 ---
 
-## <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/terminal.svg" width="22" height="22" align="center" /> Configuração do Ambiente de Desenvolvimento
+## <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/terminal.svg" width="22" height="22" valign="middle" style="vertical-align: middle; display: inline-block; margin-right: 6px;" /> Configuração do Ambiente de Desenvolvimento
 
 ### Pré-requisitos
 - **Node.js**: Versão 18.0.0 ou superior
@@ -211,7 +211,7 @@ Acesse o **SQL Editor** no painel do Supabase e execute os scripts contidos em [
 
 ---
 
-## <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/play.svg" width="22" height="22" align="center" /> Scripts Disponíveis
+## <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/play.svg" width="22" height="22" valign="middle" style="vertical-align: middle; display: inline-block; margin-right: 6px;" /> Scripts Disponíveis
 
 | Comando | Descrição |
 | :--- | :--- |
@@ -224,7 +224,7 @@ Acesse o **SQL Editor** no painel do Supabase e execute os scripts contidos em [
 
 ---
 
-## <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/shield-check.svg" width="22" height="22" align="center" /> Decisões Técnicas e Trade-offs de Engenharia
+## <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/shield-check.svg" width="22" height="22" valign="middle" style="vertical-align: middle; display: inline-block; margin-right: 6px;" /> Decisões Técnicas e Trade-offs de Engenharia
 
 ### 1. Atomicidade no Registro de Treinos e Sequências
 A computação de dias consecutivos de treino (streaks) e distribuição de experiência (XP) foi encapsulada na função PostgreSQL `process_workout_completion` com lock transacional (`SELECT ... FOR UPDATE`). Isso elimina race conditions decorrentes de múltiplos cliques no client e impede fraudes de data enviadas pelo navegador.
@@ -240,7 +240,7 @@ A interface foi estruturada com componentes primitivos do Radix UI, garantindo a
 
 ---
 
-## <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/scale.svg" width="22" height="22" align="center" /> Licença
+## <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/scale.svg" width="22" height="22" valign="middle" style="vertical-align: middle; display: inline-block; margin-right: 6px;" /> Licença
 
 Este projeto está sob a licença [MIT](./LICENSE).
 
