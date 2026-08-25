@@ -16,7 +16,6 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["assets/corpus_logo.png", "assets/corpus_isologo.png"],
       manifest: {
         name: "Corpus Prime",
         short_name: "Corpus",

@@ -35,9 +35,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }, 5000);
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('Auth event:', event);
-
       setUser(session?.user ?? null);
+
+      if (event === 'SIGNED_OUT') {
+        setProfile(null);
+        clearTimeout(safetyTimeout);
+        setLoading(false);
+        return;
+      }
 
       if (session?.user) {
         // Busca o perfil de forma assíncrona
